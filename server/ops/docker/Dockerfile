@@ -155,7 +155,7 @@ RUN apk add git
 RUN go install "github.com/blampe/goat/cmd/goat@v${GOAT_VERSION}"
 
 ## yuzutech/kroki
-FROM eclipse-temurin:21.0.9_10-jre-noble
+FROM eclipse-temurin:25-jre-noble
 
 ARG BLOCKDIAG_VERSION="3.4.2"
 ARG D2_VERSION="0.7.1"
@@ -182,6 +182,7 @@ RUN apt-get update && apt-get install --no-install-recommends --yes \
 # * texlive-science - Provides various science packages like "siunitx"
 RUN apt-get update && apt-get install --no-install-recommends --yes \
     unzip \
+    wget \
     dvisvgm=$DVISVGM_VERSION \
     libpango1.0-dev \
     librsvg2-dev \
