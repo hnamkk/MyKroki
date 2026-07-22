@@ -9,7 +9,7 @@ FROM --platform=$BUILDPLATFORM node:24.17-bookworm-slim AS kroki-builder-nomnoml
 COPY --from=nomnoml index.js package.json package-lock.json biome.json sea-config.json /app/
 WORKDIR /app
 
-RUN npm install && npm run lint
+RUN sed -i 's/\r$//' index.js && npm ci --include=optional && npm run lint
 RUN npm run build:bundle && npm run build:blob
 COPY --from=kroki-node-target /usr/local/bin/node /app/build/app.bin
 RUN npm run build:inject
@@ -45,7 +45,7 @@ FROM --platform=$BUILDPLATFORM node:24.17-bookworm-slim AS kroki-builder-dbml
 COPY --from=dbml index.js package.json package-lock.json biome.json sea-config.json /app/
 WORKDIR /app
 
-RUN npm install && npm run lint
+RUN sed -i 's/\r$//' index.js && npm ci --include=optional && npm run lint
 RUN npm run build:bundle && npm run build:blob
 COPY --from=kroki-node-target /usr/local/bin/node /app/build/app.bin
 RUN npm run build:inject
@@ -56,7 +56,7 @@ FROM --platform=$BUILDPLATFORM node:24.17-bookworm-slim AS kroki-builder-wavedro
 COPY --from=wavedrom index.js convert.js package.json package-lock.json biome.json sea-config.json /app/
 WORKDIR /app
 
-RUN npm install && npm run lint
+RUN sed -i 's/\r$//' index.js convert.js && npm ci --include=optional && npm run lint
 RUN npm run build:bundle && npm run build:blob
 COPY --from=kroki-node-target /usr/local/bin/node /app/build/app.bin
 RUN npm run build:inject
@@ -67,7 +67,7 @@ FROM --platform=$BUILDPLATFORM node:24.17-bookworm-slim AS kroki-builder-bytefie
 COPY --from=bytefield index.js package.json package-lock.json biome.json sea-config.json /app/
 WORKDIR /app
 
-RUN npm install && npm run lint
+RUN sed -i 's/\r$//' index.js && npm ci --include=optional && npm run lint
 RUN npm run build:bundle && npm run build:blob
 COPY --from=kroki-node-target /usr/local/bin/node /app/build/app.bin
 RUN npm run build:inject
@@ -182,7 +182,6 @@ RUN apt-get update && apt-get install --no-install-recommends --yes \
 # * texlive-science - Provides various science packages like "siunitx"
 RUN apt-get update && apt-get install --no-install-recommends --yes \
     unzip \
-    wget \
     dvisvgm=$DVISVGM_VERSION \
     libpango1.0-dev \
     librsvg2-dev \
@@ -208,6 +207,11 @@ RUN apt-get update && apt-get install --no-install-recommends --yes \
     texlive-pictures \
     texlive-pstricks \
     texlive-science && \
+    apt-get clean && apt-get autoremove
+
+# Keep wget separate so adding this runtime prerequisite does not invalidate
+# the expensive TeX Live layer in existing BuildKit caches.
+RUN apt-get update && apt-get install --no-install-recommends --yes wget && \
     apt-get clean && apt-get autoremove
 
 COPY --from=vega packages packages

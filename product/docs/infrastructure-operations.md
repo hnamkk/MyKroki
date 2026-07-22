@@ -26,7 +26,7 @@ Kiểm tra `http://localhost:9000/health/live` cho tiến trình Gateway và `/h
 - Smoke test sau mỗi lần deploy bằng `npm --prefix .. run smoke`.
 - Rollback bằng cách trả image tag cũ trong `.env` và chạy lại Compose.
 
-Gateway MVP không có database hay volume dữ liệu. Cache nằm trong RAM và mất khi restart; source và SVG chuẩn vẫn nằm trong Git.
+Gateway MVP không có database hay volume dữ liệu. Cache nằm trong RAM và mất khi restart; source và SVG chuẩn vẫn nằm trong Git. Cache mặc định có TTL 24 giờ, tổng trọng lượng tối đa 256 MiB và chỉ lưu từng output không quá 5 MiB. Điều chỉnh lần lượt bằng `CACHE_TTL_MS`, `CACHE_MAX_BYTES` và `CACHE_MAX_ITEM_BYTES`; `CACHE_MAX_ENTRIES` vẫn là chặn bổ sung theo số entry.
 
 ## Cấp, xoay và thu hồi API key
 
@@ -44,4 +44,4 @@ Khi cấp key, lưu plaintext vào VS Code SecretStorage hoặc GitHub Secret; c
 
 Theo dõi HTTP 5xx, thời gian render, memory/container restart, bulkhead queue và cache hit/miss tại `/metrics`. Endpoint metrics chỉ tồn tại khi `METRICS_ENABLED=true`; khi Gateway truy cập được từ Internet, reverse proxy phải giới hạn endpoint này cho mạng vận hành. Cảnh báo khi `/health/ready` lỗi liên tục trên 2 phút. LRU, single-flight và token bucket chỉ có hiệu lực trong từng Gateway replica; MVP nên bắt đầu với một replica.
 
-Các giới hạn mặc định là source 1 MiB, output 10 MiB, timeout 15 giây, 4 render đồng thời và queue 20 request. Gateway fail fast nếu giá trị nằm ngoài khoảng an toàn hoặc production bật no-auth trên địa chỉ non-loopback.
+Các giới hạn mặc định là source 1 MiB, output 10 MiB, cache 256 MiB/5 MiB mỗi item/TTL 24 giờ, timeout 15 giây, 4 render đồng thời và queue 20 request. Gateway fail fast nếu giá trị nằm ngoài khoảng an toàn, cache item limit lớn hơn tổng cache limit hoặc production bật no-auth trên địa chỉ non-loopback.

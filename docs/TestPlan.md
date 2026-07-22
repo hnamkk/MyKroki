@@ -55,7 +55,19 @@
 | GitHub E2E | Test repo trước release | Tách public/private; không dùng production credential. |
 | Performance/security | Nightly và release candidate | Môi trường cố định; lưu p50/p95/p99 và bằng chứng redaction. |
 
-### 2.3 Kỹ thuật và priority
+### 2.3 Cổng tự động cho renderer MVP
+
+| Cổng | Lệnh / vị trí | Phạm vi |
+|---|---|---|
+| Gateway unit và contract | `npm test --prefix product` | Capability metadata single-flight/TTL, version theo engine, error normalization, URI/body/output limit, weighted TTL cache, cache degradation và auth. |
+| Renderer acceptance | `npm run test:renderers --prefix product` khi Compose đang chạy | `TC-REN-001..009`, `TC-VAL-009..012`, PNG signature/dimension, C4/DOT alias và secure include. |
+| Determinism | `product/scripts/determinism-test.mjs` trong Gateway container | `TC-REN-012`, C4 và Graphviz/DOT equivalence, cache bypass. |
+| Failure isolation | Dừng Mermaid rồi chạy `npm run test:isolation --prefix product` | `TC-REN-011`, `NFR-AVL-002`; PlantUML, Graphviz và D2 vẫn render. |
+| Kroki resource cleanup | Java 25 `CommanderTest,DelegatorTest` | Process tree cleanup, companion deadline và stack-trace suppression. |
+
+Các cổng trên chạy trong job Compose của Product CI trên image Kroki/Mermaid được build từ cùng checkout. Job và từng lệnh có deadline; HTTP E2E có request timeout riêng và runner tôn trọng `Retry-After` khi acceptance vượt burst rate limit.
+
+### 2.4 Kỹ thuật và priority
 
 | Kỹ thuật | Áp dụng |
 |---|---|
@@ -163,6 +175,7 @@ Rate-limit integration test được phép dùng profile nhỏ hơn, ví dụ 6/
 | TC-CACHE-003 | Tenant cache | Hai private principal cùng input | Render bằng A rồi B. | B không dùng entry A; source/credential không nằm plaintext trong key. | P0 |
 | TC-CACHE-004 | No-store | Principal được phép | Render hai lần với no-store. | Không tạo entry; cả hai bypass. | P1 |
 | TC-CACHE-005 | Degradation | Backend khỏe, cache lỗi | Render. | Vẫn thành công no-cache; có log/metric degradation. | P1 |
+| TC-CACHE-006 | Cache resource | Cache TTL/ngưỡng item/tổng weight nhỏ | Ghi, đọc, tăng clock và thêm entry vượt giới hạn. | Entry hết hạn không được trả; item quá lớn không cache; LRU evict đến khi nằm trong count/weight limit. | P0 |
 | TC-SEC-006 | Include security | Test endpoint cô lập | Gửi remote/local/internal include. | Bị chặn; không outbound/đọc file; không rò nội dung. | P0 |
 | TC-SEC-007 | SVG sanitizer | Worker trả SVG có script/event/external URL | Render qua Gateway. | Active content bị loại; SVG còn parse được. | P0 |
 | TC-SEC-008 | Timeout | Renderer treo >15 giây | Render rồi gửi request kế tiếp. | 504; request/process hủy; slot được trả. | P0 |

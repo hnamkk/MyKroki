@@ -22,8 +22,8 @@ tasks:
 
   dockerBuildImages:
     cmds:
-      # the per-target cache locations are derived from the CACHE_FROM_DIR and CACHE_TO_DIR environment variables in docker-bake.hcl
-      - 'docker buildx bake --allow=fs=/tmp kroki companion-images {{if .BUILD_MULTIARCH}}--set "*.platform=linux/arm64,linux/amd64"{{end}}'
+      # Pull requests build and load only the native architecture. Release/nightly callers opt in with BUILD_MULTIARCH=true.
+      - 'docker buildx bake --allow=fs=/tmp kroki companion-images {{if eq (default "false" .BUILD_MULTIARCH) "true"}}--set "*.platform=linux/arm64,linux/amd64"{{else}}--load{{end}}'
 
   dockerPublishImages:
     preconditions:
@@ -36,7 +36,9 @@ tasks:
     env:
       TAG: 'smoketests'
     cmds:
-      - 'docker buildx bake --allow=fs=/tmp kroki companion-images --load'
+      - cmd: 'docker buildx bake --allow=fs=/tmp kroki companion-images --load'
+        status:
+          - 'test "{{.SKIP_DOCKER_BUILD}}" = "true"'
       - 'docker compose --file {{.TESTS_DIR}}/docker-compose.yaml up --build --detach'
       - defer: 'docker compose --file {{.TESTS_DIR}}/docker-compose.yaml stop'
       - 'echo'

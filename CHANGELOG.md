@@ -15,7 +15,14 @@ versioned entry and uses it as the GitHub release notes.
 
 - Integrate the Diagram as Code product workspace with its Fastify Gateway, shared contracts, VS Code extension, GitHub Action, deployment files, and product CI/release workflows.
 - Standardize `.diagram.yml` with a shared JSON Schema and output planner, align Gateway and clients to the OpenAPI v1 routes, and add per-principal rate limiting.
-- Harden the Gateway production boundary with hashed API-key records and scopes, partitioned cache, bounded render concurrency, response-size limits, SVG sanitization, PNG/content-type validation, structured redacted events, and aggregate Prometheus metrics.
+- Harden the Gateway production boundary with hashed API-key records and scopes, partitioned weighted TTL cache with failure degradation, bounded render concurrency, response-size limits, SVG sanitization, PNG/content-type validation, structured redacted events, and aggregate Prometheus metrics.
+- Publish real per-engine renderer versions and isolated availability with deterministic capability caching, add SVG/PNG/C4/DOT acceptance and determinism gates, neutralize unsafe PlantUML includes, normalize renderer diagnostics without internal stack traces, and reap CLI process trees on timeout.
+
+### Changed
+
+- Reduce container CI time by fixing the false multi-architecture build condition, loading native images only once before smoke tests, persisting BuildKit layers with a stable Docker-input cache key, and bounding the build and smoke-test steps with diagnostics on failure.
+- Make Product CI build Kroki and Mermaid from the same checkout, trigger on fork/renderer changes, bound every E2E stage, and persist fork image layers.
+- Make Node SEA renderer stages reproducible with lockfile installs, optional native tooling, and host-independent lint input.
 
 ## [0.31.1] - 2026-07-15
 

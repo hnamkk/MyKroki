@@ -1,19 +1,46 @@
 name: Product CI
 
+concurrency:
+  group: product-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches: [main]
     paths:
       - "product/**"
+      - "server/**"
+      - "mermaid/**"
+      - "lib/browser-instance/**"
+      - "bytefield/**"
+      - "dbml/**"
+      - "nomnoml/**"
+      - "tikz/**"
+      - "vega/**"
+      - "wavedrom/**"
+      - "docker-bake.hcl"
+      - "pom.xml"
       - ".github/workflows/product-ci.yml"
   pull_request:
     paths:
       - "product/**"
+      - "server/**"
+      - "mermaid/**"
+      - "lib/browser-instance/**"
+      - "bytefield/**"
+      - "dbml/**"
+      - "nomnoml/**"
+      - "tikz/**"
+      - "vega/**"
+      - "wavedrom/**"
+      - "docker-bake.hcl"
+      - "pom.xml"
       - ".github/workflows/product-ci.yml"
 
 jobs:
   quality:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
@@ -42,26 +69,71 @@ jobs:
 
   compose:
     runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      KROKI_IMAGE: yuzutech/kroki:product-ci
+      MERMAID_IMAGE: yuzutech/kroki-mermaid:product-ci
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-node@v6
         with:
           node-version: 24
+      - uses: docker/setup-buildx-action@v3
+        with:
+          buildkitd-config-inline: |
+            [worker.oci]
+              max-parallelism = 2
+      - name: Restore fork image layers
+        uses: actions/cache@v5
+        with:
+          path: /tmp/.product-buildx-cache
+          key: ${{ runner.os }}-product-buildx-${{ hashFiles('docker-bake.hcl', 'server/ops/docker/Dockerfile', 'server/pom.xml', 'mermaid/Dockerfile', '**/package-lock.json', 'vega/deno.lock', 'lib/browser-instance/**') }}
+          restore-keys: |
+            ${{ runner.os }}-product-buildx-
+        env:
+          SEGMENT_DOWNLOAD_TIMEOUT_MINS: 5
+      - name: Build fork images from this commit
+        run: timeout --signal=TERM --kill-after=2m 60m docker buildx bake --allow=fs=/tmp kroki kroki-mermaid --load
+        env:
+          TAG: product-ci
+          CACHE_FROM_DIR: /tmp/.product-buildx-cache
+          CACHE_TO_DIR: /tmp/.product-buildx-cache-new
+      - name: Finalize fork image cache
+        run: |
+          if [ -d /tmp/.product-buildx-cache-new ]; then
+            rm -rf /tmp/.product-buildx-cache
+            mv /tmp/.product-buildx-cache-new /tmp/.product-buildx-cache
+          fi
       - name: Start rendering stack
         env:
           DIAGRAM_API_KEY_RECORDS: '[{"id":"ci","verifier":"sha256:f82da6e2b2e51c046a2eaf10964ef184b69c0aee9892f10a2a7b657477d407e6","scopes":["diagram:render"],"cachePartition":"ci","status":"active"}]'
           GATEWAY_PORT: 19000
-        run: docker compose -p diagram-product-ci --env-file .env.example up -d --build
+        run: timeout --signal=TERM --kill-after=1m 10m docker compose -p diagram-product-ci --env-file .env.example up -d --build
         working-directory: product/deploy
       - name: Smoke renderers
         env:
           DIAGRAM_GATEWAY_URL: http://localhost:19000
           DIAGRAM_API_KEY: ci-secret
-        run: node scripts/smoke-test.mjs
+        run: timeout --signal=TERM --kill-after=1m 8m node scripts/smoke-test.mjs
+        working-directory: product
+      - name: Verify renderer formats, aliases, errors, and secure includes
+        env:
+          DIAGRAM_GATEWAY_URL: http://localhost:19000
+          DIAGRAM_API_KEY: ci-secret
+        run: timeout --signal=TERM --kill-after=1m 10m npm run test:renderers
         working-directory: product
       - name: Verify deterministic renderer output without Gateway cache
-        run: docker compose -p diagram-product-ci --env-file .env.example exec -T -e KROKI_DIRECT_URL=http://kroki:8000 gateway node scripts/determinism-test.mjs
+        run: timeout --signal=TERM --kill-after=1m 8m docker compose -p diagram-product-ci --env-file .env.example exec -T -e KROKI_DIRECT_URL=http://kroki:8000 gateway node scripts/determinism-test.mjs
         working-directory: product/deploy
+      - name: Stop Mermaid companion for isolation test
+        run: docker compose -p diagram-product-ci --env-file .env.example stop mermaid
+        working-directory: product/deploy
+      - name: Verify companion failure isolation
+        env:
+          DIAGRAM_GATEWAY_URL: http://localhost:19000
+          DIAGRAM_API_KEY: ci-secret
+        run: timeout --signal=TERM --kill-after=1m 5m npm run test:isolation
+        working-directory: product
       - name: Show container logs
         if: failure()
         run: docker compose -p diagram-product-ci --env-file .env.example logs --no-color --tail=300

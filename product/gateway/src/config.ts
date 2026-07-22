@@ -18,6 +18,9 @@ export interface GatewayConfig {
   renderMaxConcurrent: number;
   renderMaxQueue: number;
   cacheMaxEntries: number;
+  cacheMaxBytes: number;
+  cacheMaxItemBytes: number;
+  cacheTtlMs: number;
   rendererVersion: string;
   sanitizerVersion: string;
   gatewayVersion: string;
@@ -128,6 +131,12 @@ export function loadGatewayConfig(env: NodeJS.ProcessEnv = process.env): Gateway
     throw new Error("LOG_LEVEL is invalid");
   }
 
+  const cacheMaxBytes = integerInRange(env.CACHE_MAX_BYTES, 268_435_456, "CACHE_MAX_BYTES", 1, 4_294_967_296);
+  const cacheMaxItemBytes = integerInRange(env.CACHE_MAX_ITEM_BYTES, 5_242_880, "CACHE_MAX_ITEM_BYTES", 1, 52_428_800);
+  if (cacheMaxItemBytes > cacheMaxBytes) {
+    throw new Error("CACHE_MAX_ITEM_BYTES must not exceed CACHE_MAX_BYTES");
+  }
+
   return {
     authMode,
     apiKeyRecords,
@@ -141,6 +150,9 @@ export function loadGatewayConfig(env: NodeJS.ProcessEnv = process.env): Gateway
     renderMaxConcurrent: integerInRange(env.RENDER_MAX_CONCURRENT, 4, "RENDER_MAX_CONCURRENT", 1, 64),
     renderMaxQueue: integerInRange(env.RENDER_MAX_QUEUE, 20, "RENDER_MAX_QUEUE", 0, 1_000),
     cacheMaxEntries: integerInRange(env.CACHE_MAX_ENTRIES, 500, "CACHE_MAX_ENTRIES", 1, 100_000),
+    cacheMaxBytes,
+    cacheMaxItemBytes,
+    cacheTtlMs: integerInRange(env.CACHE_TTL_MS, 86_400_000, "CACHE_TTL_MS", 1_000, 604_800_000),
     rendererVersion: env.RENDERER_VERSION ?? "kroki-0.31.1",
     sanitizerVersion: env.SANITIZER_VERSION ?? "svg-sanitizer-1",
     gatewayVersion: env.GATEWAY_VERSION ?? "0.1.0",

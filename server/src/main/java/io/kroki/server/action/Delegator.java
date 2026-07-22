@@ -83,8 +83,7 @@ public class Delegator {
               } else if (error instanceof JsonObject) {
                 String errorName = ((JsonObject) error).getString("name", "Error");
                 String message = ((JsonObject) error).getString("message", "Unexpected error");
-                String stackTrace = ((JsonObject) error).getString("stacktrace", "");
-                errorMessage = errorName + ": " + message + "\n" + stackTrace;
+                errorMessage = errorName + ": " + message;
               } else {
                 errorMessage = "Unexpected error";
               }

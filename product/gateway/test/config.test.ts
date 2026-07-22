@@ -82,6 +82,9 @@ test("parses bounded operational limits", () => {
     RENDER_MAX_CONCURRENT: "3",
     RENDER_MAX_QUEUE: "0",
     CACHE_MAX_ENTRIES: "10",
+    CACHE_MAX_BYTES: "1048576",
+    CACHE_MAX_ITEM_BYTES: "524288",
+    CACHE_TTL_MS: "60000",
     RATE_LIMIT_PER_MINUTE: "120",
     RATE_LIMIT_BURST: "20",
     METRICS_ENABLED: "false",
@@ -94,6 +97,9 @@ test("parses bounded operational limits", () => {
   assert.equal(config.renderMaxConcurrent, 3);
   assert.equal(config.renderMaxQueue, 0);
   assert.equal(config.cacheMaxEntries, 10);
+  assert.equal(config.cacheMaxBytes, 1_048_576);
+  assert.equal(config.cacheMaxItemBytes, 524_288);
+  assert.equal(config.cacheTtlMs, 60_000);
   assert.equal(config.rateLimitPerMinute, 120);
   assert.equal(config.rateLimitBurst, 20);
   assert.equal(config.metricsEnabled, false);
@@ -106,4 +112,9 @@ test("rejects operational values outside safety bounds", () => {
   assert.throws(() => loadGatewayConfig({ ...base, RENDER_TIMEOUT_MS: "60001" }), /RENDER_TIMEOUT_MS/);
   assert.throws(() => loadGatewayConfig({ ...base, RENDER_MAX_CONCURRENT: "0" }), /RENDER_MAX_CONCURRENT/);
   assert.throws(() => loadGatewayConfig({ ...base, MAX_OUTPUT_BYTES: "0" }), /MAX_OUTPUT_BYTES/);
+  assert.throws(() => loadGatewayConfig({ ...base, CACHE_TTL_MS: "999" }), /CACHE_TTL_MS/);
+  assert.throws(
+    () => loadGatewayConfig({ ...base, CACHE_MAX_BYTES: "100", CACHE_MAX_ITEM_BYTES: "101" }),
+    /CACHE_MAX_ITEM_BYTES must not exceed CACHE_MAX_BYTES/,
+  );
 });

@@ -5,7 +5,12 @@ import { KrokiRenderer } from "./renderer.js";
 const config = loadGatewayConfig();
 const app = createGateway({
   config,
-  renderer: new KrokiRenderer(config.krokiBaseUrl, config.renderTimeoutMs, config.maxOutputBytes),
+  renderer: new KrokiRenderer(
+    config.krokiBaseUrl,
+    config.renderTimeoutMs,
+    config.maxOutputBytes,
+    config.rendererVersion,
+  ),
 });
 
 try {

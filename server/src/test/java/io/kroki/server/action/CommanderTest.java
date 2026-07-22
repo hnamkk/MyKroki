@@ -15,7 +15,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.InterruptedIOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
@@ -130,6 +132,43 @@ class CommanderTest {
     assertThatThrownBy(() -> new Commander(new JsonObject(config)))
       .isInstanceOf(IllegalArgumentException.class)
       .hasMessageStartingWith("Failed to parse environment variable 'KROKI_COMMAND_TIMEOUT' with value '4y' as a time value: unit is missing or unrecognized");
+  }
+
+  @Test
+  void should_kill_process_tree_after_timeout() throws IOException, InterruptedException {
+    if (!Files.isExecutable(Paths.get("/bin/sh"))) {
+      logger.warn("/bin/sh not found, unable to run process cleanup test, ignoring.");
+      return;
+    }
+    Commander commander = new Commander(new JsonObject().put("KROKI_COMMAND_TIMEOUT", "100ms"));
+    for (int attempt = 0; attempt < 3; attempt++) {
+      Path pidFile = Files.createTempFile("kroki-commander-child-", ".pid");
+      try {
+        long startedAt = System.nanoTime();
+        String command = "sleep 30 & child=$!; echo $child > '" + pidFile + "'; wait";
+        assertThatThrownBy(() -> commander.execute(new byte[0], "/bin/sh", "-c", command))
+          .isInstanceOf(InterruptedIOException.class)
+          .hasMessageContaining("forcibly killed");
+        assertThat(TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startedAt)).isLessThan(3);
+
+        long childPid = Long.parseLong(Files.readString(pidFile).trim());
+        assertThat(waitUntilProcessStops(childPid)).as("child process %s must be reaped", childPid).isTrue();
+      } finally {
+        Files.deleteIfExists(pidFile);
+      }
+    }
+  }
+
+  private static boolean waitUntilProcessStops(long pid) throws InterruptedException {
+    long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(2);
+    while (System.nanoTime() < deadline) {
+      if (ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false)) {
+        Thread.sleep(20);
+      } else {
+        return true;
+      }
+    }
+    return !ProcessHandle.of(pid).map(ProcessHandle::isAlive).orElse(false);
   }
 
   /**

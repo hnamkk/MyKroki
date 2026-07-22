@@ -1,5 +1,9 @@
 name: CI
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     paths-ignore:
@@ -21,6 +25,7 @@ on:
 jobs:
   test-containers:
     runs-on: ubuntu-24.04
+    timeout-minutes: 85
     steps:
     - uses: actions/checkout@v6
     
@@ -216,21 +221,23 @@ jobs:
           [worker.oci]
             max-parallelism = 2
 
-    - name: Cache Docker layers
+    - name: Restore Docker layers
       uses: actions/cache@v5
       with:
         path: /tmp/.buildx-cache
-        key: ${{ runner.os }}-buildx-${{ github.sha }}
+        key: ${{ runner.os }}-buildx-${{ hashFiles('docker-bake.hcl', 'server/ops/docker/Dockerfile', 'mermaid/Dockerfile', 'bpmn/Dockerfile', 'excalidraw/Dockerfile', 'diagrams.net/Dockerfile', '**/package-lock.json', 'vega/deno.lock') }}
         restore-keys: |
           ${{ runner.os }}-buildx-
+      env:
+        SEGMENT_DOWNLOAD_TIMEOUT_MINS: 5
 
     - name: Build container images
-      run: task dockerBuildImages
+      run: timeout --signal=TERM --kill-after=2m 60m task dockerBuildImages
       env:
         BUILD_MULTIARCH: ${{ inputs.build_multiarch }}
-        # one cache subdirectory per bake target, see docker-bake.hcl
         CACHE_FROM_DIR: '/tmp/.buildx-cache'
         CACHE_TO_DIR: '/tmp/.buildx-cache-new'
+        TAG: smoketests
 
     - name: 'Setup Node.js 24'
       uses: actions/setup-node@v6
@@ -241,14 +248,23 @@ jobs:
       run: npm install
 
     - name: Run smoke tests
-      run: task smokeTests
+      run: timeout --signal=TERM --kill-after=1m 20m task smokeTests
+      env:
+        # Native PR builds were loaded by dockerBuildImages. Multi-arch builds
+        # cannot use --load, so nightly/release calls rebuild the native images.
+        SKIP_DOCKER_BUILD: ${{ !inputs.build_multiarch }}
 
-    # This ugly bit is necessary if you don't want your cache to grow forever until it hits GitHub's limit of 5GB.
-    # Temp fix
-    # https://github.com/docker/build-push-action/issues/252
-    # https://github.com/moby/buildkit/issues/1896
-    - name: Move cache
+    - name: Show container diagnostics
+      if: failure()
       run: |
-        rm -rf /tmp/.buildx-cache
-        mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+        docker compose --file ci/tests/docker-compose.yaml ps --all
+        docker compose --file ci/tests/docker-compose.yaml logs --no-color --tail 200
+
+    - name: Finalize Docker layer cache
+      if: always()
+      run: |
+        if [ -d /tmp/.buildx-cache-new ]; then
+          rm -rf /tmp/.buildx-cache
+          mv /tmp/.buildx-cache-new /tmp/.buildx-cache
+        fi
 

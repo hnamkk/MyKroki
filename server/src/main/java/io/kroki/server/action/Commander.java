@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.util.Arrays;
+import java.util.concurrent.TimeUnit;
 
 public class Commander {
 
@@ -46,34 +47,57 @@ public class Commander {
     ByteArrayOutputStream stderrBuffer = new ByteArrayOutputStream();
     Thread readProcessStderr = readProcessStderr(process, stderrBuffer);
 
-    OutputStream stdin = process.getOutputStream();
-    stdin.write(source);
     try {
+      OutputStream stdin = process.getOutputStream();
+      stdin.write(source);
       stdin.flush();
-    } catch (IOException e) {
-      logger.error("Error while flushing stdin on command: " + Arrays.toString(cmd), e);
+      stdin.close();
+
+      boolean completed = process.waitFor(this.commandTimeout.duration(), this.commandTimeout.timeUnit());
+      if (!completed) {
+        terminateProcessTree(process);
+        processStdoutReader.join(readStdoutTimeout.millis());
+        readProcessStderr.join(readStderrTimeout.millis());
+        throw new InterruptedIOException("Process was forcibly killed (not responding after " + this.commandTimeout + ")");
+      }
+      // Writing to stdout/stderr is asynchronous, wait until readers drain the closed streams.
+      processStdoutReader.join(readStdoutTimeout.millis());
+      readProcessStderr.join(readStderrTimeout.millis());
+      return commandStatusHandler.handle(
+        process.exitValue(),
+        stdoutBuffer.toByteArray(),
+        stderrBuffer.toByteArray()
+      );
+    } catch (InterruptedException e) {
+      terminateProcessTree(process);
+      Thread.currentThread().interrupt();
       throw e;
+    } catch (IOException e) {
+      terminateProcessTree(process);
+      logger.error("Error while executing command: " + Arrays.toString(cmd), e);
+      throw e;
+    } finally {
+      if (process.isAlive()) terminateProcessTree(process);
+    }
+  }
+
+  private static void terminateProcessTree(Process process) {
+    ProcessHandle[] descendants = process.descendants().toArray(ProcessHandle[]::new);
+    for (int index = descendants.length - 1; index >= 0; index--) {
+      descendants[index].destroyForcibly();
     }
     try {
-      stdin.close();
-    } catch (IOException e) {
-      logger.error("Error while closing stdin on command: " + Arrays.toString(cmd), e);
-      throw e;
-    }
-
-    process.waitFor(this.commandTimeout.duration(), this.commandTimeout.timeUnit());
-    // writing to stdout is asynchronous, wait until there is no more data in the stdout stream
-    processStdoutReader.join(readStdoutTimeout.millis());
-    // writing to stderr is asynchronous, wait until there is no more data in the stderr stream
-    readProcessStderr.join(readStderrTimeout.millis());
-    byte[] output = stdoutBuffer.toByteArray();
-
-    if (process.isAlive()) {
+      // A shell waiting on a child must stay alive long enough to reap it.
+      // Killing the parent immediately can leave a zombie under a container PID 1
+      // that does not act as an init process.
+      if (!process.waitFor(500, TimeUnit.MILLISECONDS)) {
+        process.destroyForcibly();
+        process.waitFor(1, TimeUnit.SECONDS);
+      }
+    } catch (InterruptedException e) {
       process.destroyForcibly();
-      throw new InterruptedIOException("Process was forcibly killed (not responding after " + this.commandTimeout + " seconds)");
+      Thread.currentThread().interrupt();
     }
-    int exitValue = process.exitValue();
-    return commandStatusHandler.handle(exitValue, output, stderrBuffer.toByteArray());
   }
 
   private static Thread readProcessStdout(final Process process, final ByteArrayOutputStream buffer) {
