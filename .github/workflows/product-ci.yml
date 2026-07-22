@@ -93,7 +93,7 @@ jobs:
         env:
           SEGMENT_DOWNLOAD_TIMEOUT_MINS: 5
       - name: Build fork images from this commit
-        run: timeout --signal=TERM --kill-after=2m 60m docker buildx bake --allow=fs=/tmp kroki kroki-mermaid --load
+        run: timeout --signal=TERM --kill-after=2m 60m docker buildx bake --allow=fs=.. --allow=fs=/tmp kroki kroki-mermaid --load
         env:
           TAG: product-ci
           CACHE_FROM_DIR: /tmp/.product-buildx-cache
