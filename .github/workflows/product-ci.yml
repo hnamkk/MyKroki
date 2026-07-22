@@ -78,8 +78,16 @@ jobs:
       - uses: actions/setup-node@v6
         with:
           node-version: 24
-      - uses: docker/setup-buildx-action@v3
+      - uses: actions/setup-java@v5
         with:
+          java-version: 25
+          distribution: temurin
+          cache: maven
+      - name: Package Kroki server for the container image
+        run: ./mvnw --no-transfer-progress -DskipTests package
+      - uses: docker/setup-buildx-action@v4
+        with:
+          version: v0.34.1
           buildkitd-config-inline: |
             [worker.oci]
               max-parallelism = 2
