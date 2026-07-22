@@ -6,11 +6,12 @@
   "main": "dist/index.cjs",
   "scripts": {
     "prebuild": "npm --workspace=@diagram-as-code/contracts run build && npm --workspace=@diagram-as-code/diagram-config run build",
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node24 --format=cjs --outfile=dist/index.cjs",
+    "build": "esbuild src/index.ts --bundle --platform=node --target=node24 --format=cjs --minify --legal-comments=none --outfile=dist/index.cjs",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@actions/artifact": "^6.2.1",
     "@actions/core": "^3.0.1",
     "@diagram-as-code/contracts": "0.1.0",
     "@diagram-as-code/diagram-config": "0.1.0",

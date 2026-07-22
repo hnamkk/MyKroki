@@ -1,0 +1,10 @@
+version: 1
+
+sources:
+  - product/github-action/e2e/diagrams/**/*.mmd
+
+output: product/github-action/e2e/generated
+
+defaults:
+  format: svg
+  theme: default

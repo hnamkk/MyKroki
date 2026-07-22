@@ -6,22 +6,39 @@ import * as core from "@actions/core";
 import { parseDiagramConfig } from "@diagram-as-code/diagram-config";
 import fastGlob from "fast-glob";
 
-import {
-  buildVerificationPlan,
-  deterministicRequest,
-  parseNameStatus,
-  type FileChange,
-} from "./core.js";
+import { uploadPreviewArtifact } from "./artifact.js";
+import { parseActionInputs, parseNameStatus, resolveWithinRoot, type FileChange } from "./core.js";
+import { renderDiagram } from "./gateway-client.js";
+import { createRenderRequest, runAction, type ActionOutcome, type RunActionResult } from "./runner.js";
 
-interface StaleDiagram {
-  sourcePath: string;
-  outputPath: string;
-  reason: "missing" | "stale" | "orphaned";
+interface PullRequestEvent {
+  pull_request?: {
+    number?: number;
+    base?: { sha?: string };
+    head?: { repo?: { fork?: boolean } };
+  };
 }
 
-function readChanges(): FileChange[] | undefined {
+function readEvent(): PullRequestEvent {
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (!eventPath || !existsSync(eventPath)) return {};
+  try {
+    return JSON.parse(readFileSync(eventPath, "utf8")) as PullRequestEvent;
+  } catch {
+    return {};
+  }
+}
+
+function isPullRequest(): boolean {
+  return (process.env.GITHUB_EVENT_NAME ?? "").startsWith("pull_request");
+}
+
+function readChanges(event: PullRequestEvent): FileChange[] | undefined {
+  const baseSha = event.pull_request?.base?.sha;
   const baseRef = process.env.GITHUB_BASE_REF;
-  const range = baseRef ? `origin/${baseRef}...HEAD` : "HEAD^...HEAD";
+  const base = baseSha && /^[0-9a-f]{40}$/i.test(baseSha) ? baseSha : baseRef ? `origin/${baseRef}` : undefined;
+  if (!base) return undefined;
+  const range = `${base}...HEAD`;
   try {
     const output = execFileSync("git", ["diff", "--name-status", "-M", range], {
       encoding: "utf8",
@@ -34,87 +51,108 @@ function readChanges(): FileChange[] | undefined {
   }
 }
 
-async function render(baseUrl: string, apiKey: string, request: ReturnType<typeof deterministicRequest>): Promise<Buffer> {
-  const response = await fetch(`${baseUrl.replace(/\/$/, "")}/api/v1/render`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify(request),
-  });
-  const body = Buffer.from(await response.arrayBuffer());
-  if (!response.ok) {
-    throw new Error(`Gateway render failed (${response.status}): ${body.toString("utf8")}`);
-  }
-  return body;
+function pullRequestFilesUrl(event: PullRequestEvent): string | undefined {
+  const repository = process.env.GITHUB_REPOSITORY;
+  const number = event.pull_request?.number;
+  return repository && number
+    ? `${process.env.GITHUB_SERVER_URL ?? "https://github.com"}/${repository}/pull/${number}/files`
+    : undefined;
 }
 
-function pullRequestFilesUrl(): string | undefined {
-  const repository = process.env.GITHUB_REPOSITORY;
-  const eventPath = process.env.GITHUB_EVENT_PATH;
-  if (!repository || !eventPath || !existsSync(eventPath)) return undefined;
-  try {
-    const event = JSON.parse(readFileSync(eventPath, "utf8")) as { pull_request?: { number?: number } };
-    const number = event.pull_request?.number;
-    return number ? `${process.env.GITHUB_SERVER_URL ?? "https://github.com"}/${repository}/pull/${number}/files` : undefined;
-  } catch {
-    return undefined;
+function outcomeLabel(outcome: ActionOutcome): string {
+  return outcome.status === "error" && outcome.code ? `${outcome.status} (${outcome.code})` : outcome.status;
+}
+
+async function writeSummary(result: RunActionResult, mode: "check" | "generate", filesUrl?: string): Promise<void> {
+  const headline = mode === "check"
+    ? result.failed
+      ? "Diagram check requires attention."
+      : `All ${result.checkedCount} checked diagram(s) are current.`
+    : result.failed
+      ? "Diagram generation failed; the workspace was not changed."
+      : `Generated ${result.changedCount} diagram artifact change(s).`;
+  core.summary.addHeading("Diagram as Code").addRaw(`${headline}\n`);
+  if (result.outcomes.length > 0) {
+    core.summary.addTable([
+      [
+        { data: "Status", header: true },
+        { data: "Source", header: true },
+        { data: "Generated output", header: true },
+        { data: "Request", header: true },
+      ],
+      ...result.outcomes.map((item) => [
+        outcomeLabel(item),
+        item.sourcePath ? `\`${item.sourcePath}\`` : "-",
+        `\`${item.outputPath}\``,
+        item.requestId ?? "-",
+      ]),
+    ]);
   }
+  if (filesUrl) core.summary.addRaw(`\n[Open the pull request file diff](${filesUrl})\n`);
+  await core.summary.write();
 }
 
 async function run(): Promise<void> {
-  const root = process.env.GITHUB_WORKSPACE ?? process.cwd();
-  const configPath = core.getInput("config-path") || ".diagram.yml";
-  const config = parseDiagramConfig(readFileSync(path.join(root, configPath), "utf8"));
-  const gatewayUrl = core.getInput("gateway-url", { required: true });
-  const apiKey = core.getInput("api-key", { required: true });
-  const changedOnly = (core.getInput("changed-only") || "true").toLowerCase() === "true";
+  const root = path.resolve(process.env.GITHUB_WORKSPACE ?? process.cwd());
+  const inputs = parseActionInputs({
+    "gateway-url": core.getInput("gateway-url"),
+    "api-key": core.getInput("api-key"),
+    "config-path": core.getInput("config-path"),
+    mode: core.getInput("mode"),
+    "changed-only": core.getInput("changed-only"),
+    "artifact-name": core.getInput("artifact-name"),
+    "fail-on-stale": core.getInput("fail-on-stale"),
+  });
+  if (inputs.apiKey) core.setSecret(inputs.apiKey);
 
-  const allSources = (await fastGlob(config.sources, {
+  const event = readEvent();
+  if (inputs.mode === "generate" && isPullRequest()) {
+    const forkHint = event.pull_request?.head?.repo?.fork ? " Fork pull requests do not receive repository secrets." : "";
+    throw new Error(`Mode 'generate' is disabled for pull_request events. Run it from a trusted push or workflow_dispatch event.${forkHint}`);
+  }
+
+  const config = parseDiagramConfig(readFileSync(resolveWithinRoot(root, inputs.configPath), "utf8"));
+  const allSources = (await fastGlob(config.sources, { cwd: root, onlyFiles: true, dot: false }))
+    .map((file) => file.replaceAll("\\", "/"))
+    .sort();
+  const generatedFiles = (await fastGlob(`${config.output.replace(/\/$/, "")}/**/*.{svg,png}`, {
     cwd: root,
     onlyFiles: true,
     dot: false,
-  })).map((file) => file.replaceAll("\\", "/"));
-  const changes = changedOnly ? readChanges() : undefined;
+  })).map((file) => file.replaceAll("\\", "/")).sort();
+
+  const useChangedFiles = inputs.changedOnly && isPullRequest();
+  const changes = useChangedFiles ? readChanges(event) : undefined;
+  const normalizedConfigPath = inputs.configPath.replaceAll("\\", "/");
   const renderingInputsChanged = changes?.some((change) =>
-    change.path === configPath || change.path === ".diagram-renderer.lock",
+    change.path.replaceAll("\\", "/") === normalizedConfigPath
+    || change.path.replaceAll("\\", "/") === ".diagram-renderer.lock"
   ) ?? true;
-  const plan = buildVerificationPlan(changes ?? [], allSources, config, !changedOnly || renderingInputsChanged);
-  const stale: StaleDiagram[] = [];
+  const forceAll = !useChangedFiles || changes === undefined || renderingInputsChanged;
 
-  for (const item of plan) {
-    const absoluteOutput = path.join(root, item.outputPath);
-    if (item.operation === "remove") {
-      if (existsSync(absoluteOutput)) stale.push({ ...item, reason: "orphaned" });
-      continue;
-    }
+  const result = await runAction(
+    { root, config, inputs, allSources, generatedFiles, changes: changes ?? [], forceAll },
+    {
+      render: (sourcePath, source, diagramConfig) =>
+        renderDiagram(inputs.gatewayUrl, inputs.apiKey, createRenderRequest(sourcePath, source, diagramConfig)),
+      publish: uploadPreviewArtifact,
+      reporter: {
+        error: (message, properties) => core.error(message, properties),
+        warning: (message) => core.warning(message),
+      },
+    },
+  );
 
-    const source = readFileSync(path.join(root, item.sourcePath), "utf8");
-    const output = await render(gatewayUrl, apiKey, deterministicRequest(item.sourcePath, source, config));
-    if (!existsSync(absoluteOutput)) {
-      stale.push({ ...item, reason: "missing" });
-    } else if (!readFileSync(absoluteOutput).equals(output)) {
-      stale.push({ ...item, reason: "stale" });
-    }
-  }
-
-  core.setOutput("checked-count", plan.filter((item) => item.operation === "verify").length);
-  core.setOutput("stale-count", stale.length);
-  await core.summary.addHeading("Diagram as Code").addRaw(
-    stale.length === 0
-      ? `All ${plan.length} planned diagram artifact(s) are current.\n`
-      : `${stale.length} generated SVG artifact(s) need attention.\n`,
-  ).write();
-
-  if (stale.length > 0) {
-    const filesUrl = pullRequestFilesUrl();
-    const rows = stale.map((item) => [item.reason, `\`${item.sourcePath}\``, `\`${item.outputPath}\``]);
-    await core.summary
-      .addTable([[{ data: "Status", header: true }, { data: "Source", header: true }, { data: "Generated SVG", header: true }], ...rows])
-      .addRaw(filesUrl ? `\n[Open the pull request image diff](${filesUrl})\n` : "")
-      .write();
-    core.setFailed("Generated diagrams are missing, stale, or should be removed. Export the SVGs in VS Code and commit them.");
+  core.setOutput("checked-count", result.checkedCount);
+  core.setOutput("stale-count", result.staleCount);
+  core.setOutput("generated-count", result.changedCount);
+  await writeSummary(result, inputs.mode, pullRequestFilesUrl(event));
+  if (result.failed) {
+    core.setFailed(
+      result.errorCount > 0
+        ? `${result.errorCount} diagram(s) failed to render. See annotations and the preview artifact for details.`
+        : `${result.staleCount} generated diagram(s) are missing, stale, or orphaned.`,
+    );
   }
 }
 

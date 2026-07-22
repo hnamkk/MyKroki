@@ -30,6 +30,9 @@ More comprehensive installation instructions are in the {uri-kroki-docs}[Kroki d
 The repository also contains a self-hosted product layer in link:product/README.md[`product/`].
 It adds a TypeScript/Fastify Gateway, shared project contracts, a VS Code extension,
 a GitHub Action, and a Docker Compose topology in front of the Kroki rendering backend.
+The Action supports read-only pull-request checks, preview artifacts, renderer annotations,
+and trusted-event generation without committing automatically; see
+link:product/github-action/README.md[the setup and fork-security guide].
 
 Install and verify the product workspace independently:
 

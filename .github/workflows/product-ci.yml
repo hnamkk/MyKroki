@@ -116,6 +116,140 @@ jobs:
           DIAGRAM_API_KEY: ci-secret
         run: timeout --signal=TERM --kill-after=1m 8m node scripts/smoke-test.mjs
         working-directory: product
+      - name: Prepare GitHub Action E2E fixture
+        env:
+          DIAGRAM_GATEWAY_URL: http://localhost:19000
+          DIAGRAM_API_KEY: ci-secret
+        run: |
+          mkdir -p product/github-action/e2e/generated
+          node --input-type=module <<'EOF'
+          import { readFile, writeFile } from "node:fs/promises";
+          const source = await readFile("product/github-action/e2e/diagrams/workflow.mmd", "utf8");
+          const response = await fetch(`${process.env.DIAGRAM_GATEWAY_URL}/api/v1/render`, {
+            method: "POST",
+            headers: { authorization: `Bearer ${process.env.DIAGRAM_API_KEY}`, "content-type": "application/json" },
+            body: JSON.stringify({
+              engine: "mermaid",
+              format: "svg",
+              source,
+              options: {
+                theme: "default",
+                "deterministic-ids": true,
+                "deterministic-id-seed": "product/github-action/e2e/diagrams/workflow.mmd"
+              }
+            })
+          });
+          if (!response.ok) throw new Error(`Fixture render failed: ${response.status} ${await response.text()}`);
+          await writeFile("product/github-action/e2e/generated/workflow.svg", Buffer.from(await response.arrayBuffer()));
+          EOF
+          cp product/github-action/e2e/diagrams/workflow.mmd "${RUNNER_TEMP}/workflow.mmd"
+          git status --porcelain=v1 > "${RUNNER_TEMP}/diagram-status-before-check"
+      - name: Run bundled Action check E2E
+        uses: ./product/github-action
+        with:
+          gateway-url: http://localhost:19000
+          api-key: ci-secret
+          config-path: product/github-action/e2e/.diagram.yml
+          changed-only: "false"
+          artifact-name: action-e2e-current
+      - name: Verify check mode did not mutate the repository
+        run: |
+          git status --porcelain=v1 > "${RUNNER_TEMP}/diagram-status-after-check"
+          diff -u "${RUNNER_TEMP}/diagram-status-before-check" "${RUNNER_TEMP}/diagram-status-after-check"
+      - name: Make generated output stale
+        run: |
+          printf '\n  SVG --> Review\n' >> product/github-action/e2e/diagrams/workflow.mmd
+          git status --porcelain=v1 > "${RUNNER_TEMP}/diagram-status-before-stale"
+      - name: Verify bundled Action detects stale output
+        id: action-stale
+        continue-on-error: true
+        uses: ./product/github-action
+        with:
+          gateway-url: http://localhost:19000
+          api-key: ci-secret
+          config-path: product/github-action/e2e/.diagram.yml
+          changed-only: "false"
+          artifact-name: action-e2e-stale
+      - name: Assert stale check failed without rewriting output
+        env:
+          ACTION_OUTCOME: ${{ steps.action-stale.outcome }}
+        run: |
+          test "${ACTION_OUTCOME}" = "failure"
+          git status --porcelain=v1 > "${RUNNER_TEMP}/diagram-status-after-stale"
+          diff -u "${RUNNER_TEMP}/diagram-status-before-stale" "${RUNNER_TEMP}/diagram-status-after-stale"
+      - name: Replace fixture with invalid Mermaid source
+        run: |
+          printf 'flowchart LR\n  A --\n' > product/github-action/e2e/diagrams/workflow.mmd
+          git status --porcelain=v1 > "${RUNNER_TEMP}/diagram-status-before-syntax"
+      - name: Verify syntax annotation and failure taxonomy
+        id: action-syntax
+        continue-on-error: true
+        uses: ./product/github-action
+        with:
+          gateway-url: http://localhost:19000
+          api-key: ci-secret
+          config-path: product/github-action/e2e/.diagram.yml
+          changed-only: "false"
+          artifact-name: action-e2e-syntax-error
+      - name: Assert syntax check failed
+        env:
+          ACTION_OUTCOME: ${{ steps.action-syntax.outcome }}
+        run: |
+          test "${ACTION_OUTCOME}" = "failure"
+          git status --porcelain=v1 > "${RUNNER_TEMP}/diagram-status-after-syntax"
+          diff -u "${RUNNER_TEMP}/diagram-status-before-syntax" "${RUNNER_TEMP}/diagram-status-after-syntax"
+      - name: Verify API-key failure is explicit
+        id: action-auth
+        continue-on-error: true
+        uses: ./product/github-action
+        with:
+          gateway-url: http://localhost:19000
+          api-key: invalid-key
+          config-path: product/github-action/e2e/.diagram.yml
+          changed-only: "false"
+          artifact-name: action-e2e-auth-error
+      - name: Assert authentication check failed
+        env:
+          ACTION_OUTCOME: ${{ steps.action-auth.outcome }}
+        run: test "${ACTION_OUTCOME}" = "failure"
+      - name: Verify pull requests cannot enter generate mode
+        if: github.event_name == 'pull_request'
+        id: action-pr-generate
+        continue-on-error: true
+        uses: ./product/github-action
+        with:
+          gateway-url: http://localhost:19000
+          api-key: ci-secret
+          config-path: product/github-action/e2e/.diagram.yml
+          mode: generate
+      - name: Assert pull-request generate guard
+        if: github.event_name == 'pull_request'
+        env:
+          ACTION_OUTCOME: ${{ steps.action-pr-generate.outcome }}
+        run: test "${ACTION_OUTCOME}" = "failure"
+      - name: Restore valid source for trusted generate E2E
+        if: github.event_name != 'pull_request'
+        run: |
+          cp "${RUNNER_TEMP}/workflow.mmd" product/github-action/e2e/diagrams/workflow.mmd
+          mv product/github-action/e2e/generated/workflow.svg "${RUNNER_TEMP}/workflow-before-generate.svg"
+      - name: Run bundled Action generate E2E on trusted event
+        if: github.event_name != 'pull_request'
+        id: action-generate
+        uses: ./product/github-action
+        with:
+          gateway-url: http://localhost:19000
+          api-key: ci-secret
+          config-path: product/github-action/e2e/.diagram.yml
+          changed-only: "false"
+          mode: generate
+          artifact-name: action-e2e-generate
+      - name: Assert trusted generate wrote the missing output
+        if: github.event_name != 'pull_request'
+        env:
+          GENERATED_COUNT: ${{ steps.action-generate.outputs['generated-count'] }}
+        run: |
+          test "${GENERATED_COUNT}" = "1"
+          test -s product/github-action/e2e/generated/workflow.svg
       - name: Verify renderer formats, aliases, errors, and secure includes
         env:
           DIAGRAM_GATEWAY_URL: http://localhost:19000
