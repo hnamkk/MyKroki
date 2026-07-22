@@ -182,6 +182,7 @@ RUN apt-get update && apt-get install --no-install-recommends --yes \
 # * texlive-science - Provides various science packages like "siunitx"
 RUN apt-get update && apt-get install --no-install-recommends --yes \
     unzip \
+    wget \
     dvisvgm=$DVISVGM_VERSION \
     libpango1.0-dev \
     librsvg2-dev \

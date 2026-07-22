@@ -48,7 +48,7 @@ Bản sau MVP bổ sung OIDC cho GitHub Actions, repository policy, metrics đ�
 | Renderer | SVG E2E thật cho Mermaid, PlantUML, Graphviz và D2 | Cần PNG E2E, C4/alias test, secure include, version metadata và structured error tốt hơn. |
 | VS Code | Live preview, debounce, stale cancellation, SVG export, SecretStorage, shared config | Thiếu diagnostics, PNG export, render-on-save, connection command và preview controls. |
 | GitHub Action | API-key render, changed-file planning, missing/stale/orphaned check, summary | Thiếu annotation, artifact, `generate`, failure taxonomy, OIDC và trusted commit policy. |
-| Operations | Compose, smoke test, clean build/test, Gateway metrics/log redaction, VSIX và release bundle | Thiếu automated Compose CI gate, performance/security suite và centralized telemetry. |
+| Operations | Compose, automated SVG smoke gate trong Product CI, clean build/test, Gateway metrics/log redaction, VSIX và release bundle | Thiếu Compose acceptance mở rộng cho PNG/failure paths, performance/security suite và centralized telemetry. |
 
 ## 5. Tổng quan các phase
 

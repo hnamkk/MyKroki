@@ -44,9 +44,12 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
       - name: Start rendering stack
         env:
-          DIAGRAM_API_KEYS: ci-secret
+          DIAGRAM_API_KEY_RECORDS: '[{"id":"ci","verifier":"sha256:f82da6e2b2e51c046a2eaf10964ef184b69c0aee9892f10a2a7b657477d407e6","scopes":["diagram:render"],"cachePartition":"ci","status":"active"}]'
           GATEWAY_PORT: 19000
         run: docker compose -p diagram-product-ci --env-file .env.example up -d --build
         working-directory: product/deploy
