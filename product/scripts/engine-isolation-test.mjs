@@ -9,12 +9,16 @@ if (!apiKey) throw new Error("Set DIAGRAM_API_KEY to the key configured for the 
 let engines;
 const deadline = Date.now() + 30_000;
 while (Date.now() < deadline) {
-  const response = await fetchWithTimeout(`${baseUrl}/api/v1/engines`, {}, 5_000);
-  if (response.ok) {
-    engines = (await response.json()).engines;
-    const mermaid = engines.find((engine) => engine.id === "mermaid");
-    const others = engines.filter((engine) => engine.id !== "mermaid");
-    if (mermaid?.available === false && others.length === 3 && others.every((engine) => engine.available)) break;
+  try {
+    const response = await fetchWithTimeout(`${baseUrl}/api/v1/engines`, {}, 5_000);
+    if (response.ok) {
+      engines = (await response.json()).engines;
+      const mermaid = engines.find((engine) => engine.id === "mermaid");
+      const others = engines.filter((engine) => engine.id !== "mermaid");
+      if (mermaid?.available === false && others.length === 3 && others.every((engine) => engine.available)) break;
+    }
+  } catch (error) {
+    if (error?.name !== "TimeoutError") throw error;
   }
   await new Promise((resolve) => setTimeout(resolve, 1_000));
 }
