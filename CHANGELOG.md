@@ -23,6 +23,8 @@ versioned entry and uses it as the GitHub release notes.
 - Add GitHub Actions OIDC authentication with configurable issuer/audience/JWKS rotation, immutable repository/workflow/event/ref policy, public/private/fork PR support, redacted policy audit events, and explicit Action auth modes with API-key fallback.
 - Add Phase 6 quality gates for performance, 100-diagram workspace throughput, concurrency soak, security abuse, dependency recovery, deterministic output across restarts, flaky-test repetition, and container runtime policy.
 - Generate npm and container SBOMs, scan current-commit Gateway/Kroki/Mermaid images for all High/Critical vulnerabilities, and pin third-party GitHub Actions to immutable revisions.
+- Add the Phase 7 four-engine pilot repository, end-to-end setup/acceptance guide, operations and go/no-go runbooks, and release-bundle integrity verification.
+- Publish version-locked Gateway, Kroki fork, and Mermaid images from one product tag with SPDX SBOMs, immutable digests, manifest, and SHA-256 checksums.
 
 ### Changed
 
@@ -32,11 +34,14 @@ versioned entry and uses it as the GitHub release notes.
 - Harden the reference Compose topology with non-root/read-only containers, dropped capabilities, no-new-privileges, explicit CPU/memory/PID limits, and restart/recovery verification.
 - Update fixable runtime dependencies in the Kroki image and rebuild the pinned D2 renderer with patched Go modules while preserving D2 `0.7.1` behavior.
 - Remove compiler and Linux header packages after Kroki image assembly so build-only kernel advisories do not remain in the runtime.
+- Treat the shared `default` theme as renderer-native behavior instead of forwarding an invalid theme name to PlantUML and other engines.
 
 ### Fixed
 
 - Make the bundled GitHub Action start correctly on the Node.js 24 runner by preserving `import.meta.url` semantics in its CommonJS bundle.
 - Keep VS Code preview refreshes from superseding render-on-save writes, and make the Windows Extension Host E2E assertions independent of LF/CRLF line endings.
+- Make dependency recovery wait for a successful Mermaid render after backend restart instead of failing on a transient 503.
+- Make VSIX archives byte-for-byte reproducible by normalizing ZIP timestamps and file ordering through `SOURCE_DATE_EPOCH`.
 
 ## [0.31.1] - 2026-07-15
 

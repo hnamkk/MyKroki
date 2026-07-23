@@ -26,7 +26,7 @@
     "test:e2e": "npm run package && npm run test:e2e:build && node scripts/run-e2e.mjs",
     "test:gateway-smoke": "tsx scripts/gateway-smoke.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "package": "npm run build && vsce package --no-dependencies --out dist/diagram-as-code-vscode.vsix"
+    "package": "npm run build && node scripts/package-vsix.mjs"
   },
   "dependencies": {
     "@diagram-as-code/contracts": "0.1.0",

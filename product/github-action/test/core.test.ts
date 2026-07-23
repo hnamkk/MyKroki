@@ -73,13 +73,13 @@ test("builds deterministic OpenAPI render requests", () => {
     engine: "mermaid",
     format: "svg",
     source: "flowchart LR\nA-->B",
-    options: { theme: "default", "deterministic-ids": true, "deterministic-id-seed": "docs/diagrams/a.mmd" },
+    options: { "deterministic-ids": true, "deterministic-id-seed": "docs/diagrams/a.mmd" },
   });
   assert.deepEqual(deterministicRequest("docs/diagrams/a.puml", "@startuml\n@enduml", config), {
     engine: "plantuml",
     format: "svg",
     source: "@startuml\n@enduml",
-    options: { theme: "default", "no-metadata": true },
+    options: { "no-metadata": true },
   });
 });
 

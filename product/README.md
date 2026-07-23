@@ -22,6 +22,8 @@ Developer sửa file trong `docs/diagrams`, mở preview và dùng `Diagram: Exp
 7. Cấu hình `diagramAsCode.gatewayUrl`, lưu key bằng `Diagram: Set Gateway API Key`, rồi chạy `Diagram: Check Gateway Connection`.
 8. Thiết lập workflow theo [GitHub Action README](github-action/README.md); hosted Gateway ưu tiên GitHub OIDC, API key là fallback.
 
+Kịch bản setup và nghiệm thu từ đầu đến cuối nằm trong [E2E Setup Guide](../docs/E2E_SETUP_GUIDE.md). Fixture bốn engine dùng cho pilot nằm tại `product/examples/pilot-repository`.
+
 Các quality gate Phase 6 chạy trên cùng stack:
 
 ```powershell
@@ -35,7 +37,7 @@ npm run test:container-policy
 
 Extension Host E2E được chạy bằng `npm --workspace=diagram-as-code-vscode run test:e2e`; đặt `VSCODE_TEST_VERSION=1.100.0` để kiểm tra version tối thiểu.
 
-Các quy trình TLS, key rotation, update và rollback nằm trong [Infrastructure and Operations](docs/infrastructure-operations.md). Quy trình đóng gói, phát hành và rollback version nằm trong [Release Guide](docs/release-guide.md).
+Các quy trình TLS, key rotation, update và rollback nằm trong [Infrastructure and Operations](docs/infrastructure-operations.md). Quy trình đóng gói, phát hành và rollback version nằm trong [Release Guide](docs/release-guide.md); quyết định phát hành dùng [MVP Go/No-Go Checklist](docs/go-no-go-checklist.md).
 
 ## Phạm vi MVP
 

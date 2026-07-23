@@ -62,7 +62,7 @@ services:
       - rendering
 
   kroki:
-    image: ${KROKI_IMAGE:-yuzutech/kroki:0.31.1}
+    image: ${KROKI_IMAGE:?Set KROKI_IMAGE in .env}
     environment:
       KROKI_MERMAID_HOST: mermaid
       KROKI_SAFE_MODE: secure
@@ -86,7 +86,7 @@ services:
       - rendering
 
   mermaid:
-    image: ${MERMAID_IMAGE:-yuzutech/kroki-mermaid:0.31.1}
+    image: ${MERMAID_IMAGE:?Set MERMAID_IMAGE in .env}
     expose:
       - "8002"
     restart: unless-stopped

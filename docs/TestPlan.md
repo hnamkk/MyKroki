@@ -43,6 +43,7 @@
 | VS Code | Debounce, sequence/cancellation, diagnostic mapping, atomic write, SecretStorage wrapper. | Extension Host với mock Gateway trả delayed/error/binary response. | VS Code desktop + Gateway: unsaved preview, diagnostics, export, render-on-save. |
 | GitHub Action | Input parser, change detector, auth provider, stale comparator, annotation và commit selection. | Action runner với mock/real Gateway; API key/OIDC, artifact, exit code. | Workflow trên public/private test repo: PR check, generate, optional trusted commit. |
 | Operations | Config/fail-fast, health aggregation, log redaction và metric labels. | Docker Compose, network exposure, restart và dependency failure. | Chỉ Gateway public; readiness và phục hồi renderer đúng. |
+| Release/Pilot | Version lock, manifest và checksum parser. | Bundle chứa VSIX, Action, Compose, config và SBOM; ba image cùng tag/digest. | Setup mới, pilot PR, upgrade và rollback theo artifact versioned. |
 
 ### 2.2 Mức kiểm thử và lịch chạy
 
@@ -54,6 +55,7 @@
 | VS Code E2E | PR extension: Linux trên version tối thiểu/Stable và Windows Stable | Extension Host headless, cài VSIX thật; Compose chạy thêm smoke client với Gateway thật. |
 | GitHub E2E | Test repo trước release | Tách public/private; không dùng production credential. |
 | Performance/security | Nightly và release candidate | Môi trường cố định; lưu p50/p95/p99 và bằng chứng redaction. |
+| Release acceptance | Mỗi product tag candidate | Verify bundle/checksum/SBOM, pilot bốn engine, ba full Product CI xanh và rollback rehearsal. |
 
 ### 2.3 Cổng tự động cho renderer MVP
 
@@ -72,10 +74,12 @@
 | Supply chain | Product CI `npm sbom`, Anchore SBOM và Trivy | SBOM cho npm/Gateway/Kroki/Mermaid; image build từ commit hiện tại không có High/Critical, không bỏ qua advisory chưa có bản vá. |
 | GitHub Action unit/integration | `npm test --workspace=diagram-as-code-action --prefix product` | Input/path guard, planner rename/delete/full scan, output collision, API key, HTTP taxonomy, annotation, check read-only, generate rollback, artifact manifest và committed CommonJS bundle khởi động trên Node.js 24. |
 | GitHub Action runner E2E | Job Compose trong `.github/workflows/product-ci.yml` | Bundle thật gọi Gateway thật; current/stale/syntax/auth, artifact upload, PR generate guard và trusted generate. |
+| Pilot generation | `npm run pilot:generate --prefix product` | Shared config/planner gọi Gateway thật và tạo đúng bốn SVG Mermaid/C4/Graphviz/D2. |
+| Release bundle | `npm run release:prepare --prefix product` và `npm run release:verify --prefix product` | Đồng bộ version, VSIX/Action/Compose/config lock, SPDX SBOM, manifest và SHA-256; VSIX được package hai lần để so hash; tagged workflow bổ sung digest/SBOM ba image. |
 
 Các cổng trên chạy trong job Compose của Product CI trên image Kroki/Mermaid được build từ cùng checkout. Job và từng lệnh có deadline; HTTP E2E có request timeout riêng và runner tôn trọng `Retry-After` khi acceptance vượt burst rate limit.
 
-OIDC (`TC-GHA-007`) và auto-commit (`TC-GHA-010..011`) vẫn là phạm vi phase sau/Could theo SRS; chúng không chặn exit criteria Phase 3 dùng API key và generate không commit.
+OIDC (`TC-GHA-007`) đã được triển khai ở Phase 5. Auto-commit (`TC-GHA-010..011`) vẫn là `Could` sau MVP và không chặn Phase 7; MVP `generate` chỉ cập nhật workspace trên trusted event.
 
 ### 2.4 Kỹ thuật và priority
 
@@ -252,6 +256,16 @@ Rate-limit integration test được phép dùng profile nhỏ hơn, ví dụ 6/
 | TC-GHA-013 | Invalid config | Config sai/path traversal | Chạy Action. | Fail trước render; chỉ field lỗi; không ghi ngoài workspace/output. | P0 |
 | TC-GHA-014 | Gateway failure | Gateway trả 429/503/504 | Chạy Action. | Exit khác 0; phân biệt lỗi, hiện requestId/Retry-After; không commit partial. | P0 |
 
+### 4.7 Release và pilot
+
+| ID | Module | Precondition | Steps | Expected Result | Priority |
+|---|---|---|---|---|---|
+| TC-REL-001 | Version lock | Package/config/renderer lock tồn tại | Chạy `release:prepare` rồi đọc manifest. | Gateway/schema/Kroki/Mermaid đồng bộ; ba image cùng product tag, digest hợp lệ khi CI cung cấp. | P0 |
+| TC-REL-002 | Artifact integrity | Release bundle đã tạo | Chạy `release:verify` và `sha256sum --check`. | Mọi artifact khớp manifest và `SHA256SUMS`; sửa một byte phải fail. | P0 |
+| TC-REL-003 | Pilot | Reference Compose ready | Chạy `pilot:generate`, VS Code preview/export và Action check trên fixture. | Bốn engine có SVG; client dùng cùng output path; check không sửa repository. | P0 |
+| TC-REL-004 | Upgrade/Rollback | Có hai release env versioned | Deploy version mới, smoke; khôi phục env cũ và smoke lại. | Readiness/render trở lại bình thường; không cần data migration; owner/evidence được ghi. | P0 |
+| TC-REL-005 | New-user setup | Máy sạch có prerequisites | Làm theo `docs/E2E_SETUP_GUIDE.md`. | Local stack và pilot bốn engine hoạt động trong tối đa 30 phút mà không đọc source. | P0 |
+
 ## 5. Traceability và báo cáo
 
 | Nhóm test | Requirement chính |
@@ -261,5 +275,6 @@ Rate-limit integration test được phép dùng profile nhỏ hơn, ví dụ 6/
 | TC-OPS-*, TC-PERF-* | FR-090..095; NFR-PERF, NFR-SCL, NFR-AVL |
 | TC-VSC-* | FR-040..046, FR-050..062 |
 | TC-GHA-* | FR-040..046, FR-070..082 |
+| TC-REL-* | FR-031..033, FR-040..045, FR-070..095; NFR-CMU-002, NFR-CMU-005..006 |
 
 Mỗi lần chạy release phải lưu commit SHA, image/renderer versions, cấu hình đã loại secret, kết quả JUnit/JSON, log redaction, artifact lỗi và p50/p95/p99. Defect phải liên kết test case ID và requirement ID; thay đổi golden output phải nêu renderer/sanitizer version.

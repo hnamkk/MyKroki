@@ -2,6 +2,22 @@ variable "TAG" {
   default = "latest"
 }
 
+variable "KROKI_IMAGE_REPOSITORY" {
+  default = "yuzutech/kroki"
+}
+
+variable "MERMAID_IMAGE_REPOSITORY" {
+  default = "yuzutech/kroki-mermaid"
+}
+
+variable "OCI_SOURCE" {
+  default = "https://github.com/yuzutech/kroki"
+}
+
+variable "OCI_URL" {
+  default = "https://kroki.io"
+}
+
 # Each target must use its own cache directory: concurrent cache exports
 # to the same local directory race in the ingest area and fail with
 # "error writing layer blob: rename tmp file ... no such file or directory".
@@ -20,8 +36,8 @@ group "companion-images" {
 target "oci-labels" {
   labels = {
     "org.opencontainers.image.description" = "Kroki provides a unified API supporting multiple diagramming formats, making it easy to create diagrams from textual descriptions."
-    "org.opencontainers.image.url" = "https://kroki.io"
-    "org.opencontainers.image.source" = "https://github.com/yuzutech/kroki"
+    "org.opencontainers.image.url" = OCI_URL
+    "org.opencontainers.image.source" = OCI_SOURCE
     "org.opencontainers.image.licenses" = "MIT"
   }
 }
@@ -37,7 +53,7 @@ target "kroki" {
     tikz = "./tikz"
   }
   dockerfile = "ops/docker/Dockerfile"
-  tags = ["yuzutech/kroki:${TAG}"]
+  tags = ["${KROKI_IMAGE_REPOSITORY}:${TAG}"]
   cache-from = CACHE_FROM_DIR != "" ? ["type=local,src=${CACHE_FROM_DIR}/kroki"] : []
   cache-to = CACHE_TO_DIR != "" ? ["type=local,dest=${CACHE_TO_DIR}/kroki"] : []
   inherits = ["oci-labels"]
@@ -51,7 +67,7 @@ target "kroki-mermaid" {
   contexts = {
     lib = "./lib/browser-instance"
   }
-  tags = ["yuzutech/kroki-mermaid:${TAG}"]
+  tags = ["${MERMAID_IMAGE_REPOSITORY}:${TAG}"]
   cache-from = CACHE_FROM_DIR != "" ? ["type=local,src=${CACHE_FROM_DIR}/mermaid"] : []
   cache-to = CACHE_TO_DIR != "" ? ["type=local,dest=${CACHE_TO_DIR}/mermaid"] : []
   inherits = ["oci-labels"]

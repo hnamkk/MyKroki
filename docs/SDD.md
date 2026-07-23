@@ -1084,6 +1084,8 @@ Production profile phải fail fast nếu bật no-auth trên non-loopback inter
 
 Reference Compose chạy cả ba container bằng non-root user, read-only root filesystem, tmpfs giới hạn cho dữ liệu tạm, `cap_drop: ALL`, `no-new-privileges`, PID/memory/CPU limits và restart policy. Chỉ Gateway publish port; Kroki và Mermaid ở private rendering network.
 
+Tagged product release publish Gateway, Kroki fork và Mermaid companion dưới cùng `product-vX.Y.Z`. Release manifest khóa `.diagram.yml` schema version, renderer versions, image tag và immutable digest; release Compose bắt buộc nhận đủ ba image reference và không fallback về image upstream. Bundle phát hành kèm VSIX, Action bundle, Compose/env example, npm/container SPDX SBOM, release notes và `SHA256SUMS`.
+
 ## 9. Kiểm thử kiến trúc tối thiểu
 
 Kế hoạch kiểm thử chi tiết, môi trường tham chiếu và danh sách test case nghiệm thu được duy trì tại [docs/TestPlan.md](TestPlan.md).
@@ -1100,6 +1102,7 @@ Kế hoạch kiểm thử chi tiết, môi trường tham chiếu và danh sách
 | Deployment smoke | Docker Compose, health/readiness và chỉ Gateway được expose. |
 | Reliability | Performance/workspace benchmark, concurrency soak, dependency kill/restart, deterministic hash qua restart và flaky-test repetition có deadline. |
 | Supply chain | SBOM cho npm và ba image runtime; Trivy chặn mọi High/Critical trên image build từ commit; runtime image loại compiler/header packages sau assembly; GitHub Actions bên thứ ba pin commit SHA. |
+| Release/pilot | Pilot fixture bốn engine, manifest/checksum verification, tagged image consistency, setup dưới 30 phút và upgrade/rollback rehearsal. |
 
 ## 10. Điểm cần xác nhận trước implementation
 

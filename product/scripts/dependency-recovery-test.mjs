@@ -12,6 +12,42 @@ if (!apiKey) throw new Error("Set DIAGRAM_API_KEY to the key configured for the 
 const expected = process.env.RECOVERY_EXPECT ?? "ready";
 if (!["degraded", "ready"].includes(expected)) throw new Error("RECOVERY_EXPECT must be degraded or ready");
 
+async function waitForMermaidRender(timeoutMs = 120_000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastFailure = "not attempted";
+
+  while (Date.now() < deadline) {
+    let response;
+    try {
+      ({ response } = await render({
+        engine: "mermaid",
+        format: "svg",
+        source: "flowchart LR\n  Restart --> Recovered",
+        cache: { mode: "no-store" },
+      }));
+    } catch (error) {
+      lastFailure = error instanceof Error ? error.message : String(error);
+      await new Promise((resolve) => setTimeout(resolve, 1_000));
+      continue;
+    }
+
+    if (response.ok) {
+      const body = await response.text();
+      if (!body.includes("<svg")) throw new Error("Mermaid returned a non-SVG success response");
+      return;
+    }
+
+    lastFailure = `HTTP ${response.status}`;
+    await response.body?.cancel();
+    if (response.status !== 503) {
+      throw new Error(`Mermaid render failed with non-retryable status ${response.status}`);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1_000));
+  }
+
+  throw new Error(`Mermaid render did not recover before the deadline; last failure: ${lastFailure}`);
+}
+
 await waitForReadiness(expected === "ready" ? 200 : 503);
 
 const live = await fetch(`${gatewayUrl}/health/live`, { signal: AbortSignal.timeout(5_000) });
@@ -44,15 +80,7 @@ if (expected === "degraded") {
   if (!ready.ok || readiness.status !== "up" || !discovery.engines.every((engine) => engine.available)) {
     throw new Error(`Stack did not recover: ${ready.status}/${JSON.stringify(discovery.engines)}`);
   }
-  const { response } = await render({
-    engine: "mermaid",
-    format: "svg",
-    source: "flowchart LR\n  Restart --> Recovered",
-    cache: { mode: "no-store" },
-  });
-  if (!response.ok || !(await response.text()).includes("<svg")) {
-    throw new Error(`Mermaid render did not recover (${response.status})`);
-  }
+  await waitForMermaidRender();
 }
 
 const report = {

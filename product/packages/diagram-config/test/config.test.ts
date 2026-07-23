@@ -63,7 +63,6 @@ test("builds the same deterministic request for all product clients", () => {
       format: "svg",
       source: "flowchart LR\nA-->B",
       options: {
-        theme: "default",
         "deterministic-ids": true,
         "deterministic-id-seed": "docs/diagrams/a.mmd",
       },
@@ -73,6 +72,8 @@ test("builds the same deterministic request for all product clients", () => {
     deterministicRenderRequest("docs/diagrams/a.mmd", "A-->B", config, "png").format,
     "png",
   );
+  const themed = parseDiagramConfig(minimal.replace("output: docs/generated", "output: docs/generated\ndefaults:\n  format: svg\n  theme: dark"));
+  assert.equal(deterministicRenderRequest("docs/diagrams/a.mmd", "A-->B", themed).options?.theme, "dark");
 });
 
 test("rejects endpoint fields, path traversal, and unsupported versions", () => {

@@ -23,11 +23,14 @@
     "test:security": "node scripts/security-test.mjs",
     "test:container-policy": "node scripts/container-policy-test.mjs",
     "test:repeat": "node scripts/repeat-test.mjs",
+    "pilot:generate": "node scripts/generate-pilot.mjs",
     "test:vscode-gateway": "npm --workspace=diagram-as-code-vscode run test:gateway-smoke",
     "contract:check": "node scripts/verify-openapi.mjs",
     "key:generate": "node scripts/generate-api-key.mjs",
+    "release:sbom": "node scripts/prepare-npm-sbom.mjs",
     "release:bundle": "node scripts/prepare-release.mjs",
-    "release:prepare": "npm audit && npm run typecheck && npm test && npm run build && npm --workspace=diagram-as-code-vscode run package && npm run release:bundle"
+    "release:verify": "node scripts/verify-release.mjs",
+    "release:prepare": "npm audit && npm run typecheck && npm test && npm run build && npm --workspace=diagram-as-code-vscode run package && npm run release:sbom && npm run release:bundle && npm run release:verify"
   },
   "devDependencies": {
     "@types/node": "^24.0.0",

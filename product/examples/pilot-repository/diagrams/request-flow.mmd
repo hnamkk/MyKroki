@@ -1,0 +1,8 @@
+sequenceDiagram
+  participant Developer
+  participant Gateway
+  participant Kroki
+  Developer->>Gateway: POST /api/v1/render
+  Gateway->>Kroki: Render Mermaid
+  Kroki-->>Gateway: SVG
+  Gateway-->>Developer: Sanitized SVG

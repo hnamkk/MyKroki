@@ -19,10 +19,10 @@ jobs:
   diagrams:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
-      - uses: hnamkk/MyKroki/product/github-action@main
+      - uses: hnamkk/MyKroki/product/github-action@product-v0.1.0
         with:
           gateway-url: ${{ vars.DIAGRAM_GATEWAY_URL }}
           auth-mode: oidc
@@ -49,15 +49,15 @@ jobs:
   generate:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: hnamkk/MyKroki/product/github-action@main
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: hnamkk/MyKroki/product/github-action@product-v0.1.0
         with:
           gateway-url: ${{ vars.DIAGRAM_GATEWAY_URL }}
           auth-mode: oidc
           oidc-audience: diagram-gateway
           mode: generate
           changed-only: "false"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: generated-workspace
           path: docs/generated
@@ -94,7 +94,7 @@ Action trả `checked-count`, `stale-count` và `generated-count`. Lỗi Gateway
 Gateway cũ hoặc deployment chưa bật OIDC có thể dùng:
 
 ```yaml
-      - uses: hnamkk/MyKroki/product/github-action@main
+      - uses: hnamkk/MyKroki/product/github-action@product-v0.1.0
         with:
           gateway-url: ${{ vars.DIAGRAM_GATEWAY_URL }}
           auth-mode: api-key

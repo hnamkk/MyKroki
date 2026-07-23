@@ -3,10 +3,11 @@ name: Diagram check
 on:
   pull_request:
     paths:
-      - "docs/diagrams/**"
-      - "docs/generated/**"
+      - "diagrams/**"
+      - "generated/**"
       - ".diagram.yml"
       - ".diagram-renderer.lock"
+  workflow_dispatch:
 
 permissions:
   contents: read

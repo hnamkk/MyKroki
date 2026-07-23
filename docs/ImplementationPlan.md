@@ -381,6 +381,10 @@ Chứng minh hệ thống ổn định trong điều kiện tải, lỗi depende
 
 Đưa sản phẩm vào một repository thật với hướng dẫn setup ngắn, có khả năng rollback và dữ liệu phản hồi.
 
+### Trạng thái
+
+Đã hoàn tất phần triển khai trong repository: version/schema/image lock, pilot fixture bốn engine, release bundle có SBOM/manifest/checksum, tagged workflow publish ba image cùng version/digest, operations/release runbook, E2E setup guide và go/no-go checklist. Phase chỉ được đánh dấu `Done` sau khi có ba full Product CI xanh liên tiếp, pilot PR thật, rehearsal upgrade/rollback bằng hai version và mentor acceptance sign-off.
+
 ### Work packages
 
 | ID | Công việc | Deliverable | Priority |
@@ -392,6 +396,18 @@ Chứng minh hệ thống ổn định trong điều kiện tải, lỗi depende
 | P7-05 | Acceptance session | Demo theo use case SRS; lưu issue và quyết định scope còn lại | P0 |
 | P7-06 | Release artifacts | Gateway image, Compose, VSIX, Action bundle, example config, SBOM/checksum, release notes | P0 |
 | P7-07 | Go/no-go review | Security, NFR, test report, known limitations và rollback owner | P0 |
+
+### Deliverable đã triển khai
+
+| Work package | Bằng chứng |
+|---|---|
+| P7-01 | `.diagram-renderer.lock` khóa Gateway, config schema, Kroki/Mermaid; release manifest khóa ba image cùng tag và digest khi publish. |
+| P7-02 | `docs/E2E_SETUP_GUIDE.md` bao phủ Compose, API key/OIDC, VSIX, Action và `.diagram.yml`. |
+| P7-03 | `product/docs/infrastructure-operations.md` bao phủ health, logs, metrics, key rotation, backup, upgrade và rollback. |
+| P7-04 | `product/examples/pilot-repository` có Mermaid, C4-PlantUML, Graphviz và D2 cùng generated SVG/workflow pin version. |
+| P7-05 | Acceptance matrix và biên bản mẫu nằm trong E2E guide/go-no-go checklist; buổi sign-off thực tế còn cần mentor. |
+| P7-06 | `release:prepare` tạo VSIX, Action bundle, Compose/env/config lock, npm SBOM, manifest/checksum; tagged workflow publish và thêm SBOM ba image. |
+| P7-07 | `product/docs/go-no-go-checklist.md` công bố external gates, known limitations, owner và No-Go conditions. |
 
 ### Exit criteria
 
@@ -487,12 +503,11 @@ Cuối mỗi phase cần review exit criteria và quyết định `Go`, `Conditi
 
 ## 19. Thứ tự công việc ngay tiếp theo
 
-Backlog bắt đầu nên theo thứ tự:
+Implementation Phase 1-7 trong repository đã hoàn tất. Công việc tiếp theo theo thứ tự:
 
-1. Khóa Gateway/renderer contract đã hoàn thành từ phase 2.
-2. GitHub Action MVP phase 3 đã hoàn thành.
-3. VS Code Extension MVP phase 4 đã hoàn thành.
-4. OIDC/repository policy phase 5 đã hoàn thành.
-5. Tiếp theo triển khai reliability và quality gates phase 6.
-
-Phase 6 dùng các OIDC/policy fixture của phase 5 để mở rộng Compose E2E, security và flaky-test control.
+1. Commit/push candidate và thu thập ba full Product CI xanh liên tiếp.
+2. Tạo repository pilot thật từ `product/examples/pilot-repository`.
+3. Chạy toàn bộ `docs/E2E_SETUP_GUIDE.md`, gồm PR stale/syntax, VS Code workflow và OIDC public/private phù hợp môi trường.
+4. Diễn tập upgrade/rollback bằng hai artifact versioned và chỉ định rollback owner.
+5. Tổ chức mentor acceptance, điền `product/docs/go-no-go-checklist.md` và chốt Go/No-Go.
+6. Chỉ lập backlog Phase 8 sau khi Phase 7 có đủ external evidence và không còn P0/P1 blocker.

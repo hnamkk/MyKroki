@@ -21,6 +21,7 @@ on:
       - "docker-bake.hcl"
       - "pom.xml"
       - ".github/workflows/product-ci.yml"
+      - ".github/workflows/product-release.yml"
   pull_request:
     paths:
       - "product/**"
@@ -36,6 +37,7 @@ on:
       - "docker-bake.hcl"
       - "pom.xml"
       - ".github/workflows/product-ci.yml"
+      - ".github/workflows/product-release.yml"
 
 jobs:
   quality:
@@ -62,13 +64,36 @@ jobs:
       - run: npm run build
         working-directory: product
       - name: Generate npm dependency SBOM
+        run: npm run release:sbom
+        working-directory: product
+      - name: Verify reproducible npm SBOM
         run: |
-          mkdir -p test-results
-          npm sbom --sbom-format=spdx > test-results/product-npm.spdx.json
+          before="$(sha256sum test-results/product-npm.spdx.json | cut -d ' ' -f 1)"
+          npm run release:sbom
+          after="$(sha256sum test-results/product-npm.spdx.json | cut -d ' ' -f 1)"
+          test "${before}" = "${after}"
         working-directory: product
       - name: Ensure the committed Action bundle is current
         run: git diff --exit-code -- product/github-action/dist/index.cjs
       - run: npm --workspace=diagram-as-code-vscode run package
+        working-directory: product
+      - name: Verify reproducible VSIX packaging
+        run: |
+          before="$(sha256sum vscode-extension/dist/diagram-as-code-vscode.vsix | cut -d ' ' -f 1)"
+          npm --workspace=diagram-as-code-vscode run package
+          after="$(sha256sum vscode-extension/dist/diagram-as-code-vscode.vsix | cut -d ' ' -f 1)"
+          test "${before}" = "${after}"
+        working-directory: product
+      - name: Verify Phase 7 release bundle
+        run: |
+          npm run release:bundle
+          npm run release:verify
+          release_tag="product-v$(node -p 'require("./package.json").version')"
+          before="$(sha256sum "release/${release_tag}/SHA256SUMS" | cut -d ' ' -f 1)"
+          npm run release:bundle
+          npm run release:verify
+          after="$(sha256sum "release/${release_tag}/SHA256SUMS" | cut -d ' ' -f 1)"
+          test "${before}" = "${after}"
         working-directory: product
       - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
@@ -264,6 +289,14 @@ jobs:
           DIAGRAM_API_KEY: ci-secret
         run: timeout --signal=TERM --kill-after=1m 3m npm run test:vscode-gateway
         working-directory: product
+      - name: Verify four-engine pilot repository
+        env:
+          DIAGRAM_GATEWAY_URL: http://localhost:19000
+          DIAGRAM_API_KEY: ci-secret
+        run: |
+          timeout --signal=TERM --kill-after=1m 5m npm run pilot:generate
+          git diff --exit-code -- examples/pilot-repository/generated
+        working-directory: product
       - name: Prepare GitHub Action E2E fixture
         env:
           DIAGRAM_GATEWAY_URL: http://localhost:19000
@@ -281,7 +314,6 @@ jobs:
               format: "svg",
               source,
               options: {
-                theme: "default",
                 "deterministic-ids": true,
                 "deterministic-id-seed": "product/github-action/e2e/diagrams/workflow.mmd"
               }

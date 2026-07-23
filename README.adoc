@@ -35,6 +35,8 @@ and trusted-event generation without committing automatically; see
 link:product/github-action/README.md[the setup and fork-security guide].
 The link:product/vscode-extension/README.md[VS Code extension] provides live preview,
 Problems diagnostics, SVG/PNG export, optional render-on-save, and Gateway connection checks.
+The complete local, VS Code, GitHub Action, pilot, release, and rollback procedure is in
+link:docs/E2E_SETUP_GUIDE.md[the E2E setup and acceptance guide].
 
 Install and verify the product workspace independently:
 
