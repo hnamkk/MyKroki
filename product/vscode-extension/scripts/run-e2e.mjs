@@ -1,31 +1,80 @@
-import { cp, mkdtemp, rm } from "node:fs/promises";
+import {
+  cp,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { runTests, runVSCodeCommand } from "@vscode/test-electron";
+import {
+  downloadAndUnzipVSCode,
+  runTests,
+  runVSCodeCommand,
+} from "@vscode/test-electron";
 
 const extensionRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const version = process.env.VSCODE_TEST_VERSION || "stable";
 const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "diagram-vscode-e2e-"));
 const workspace = path.join(temporaryRoot, "workspace");
+const extensionsDirectory = path.join(temporaryRoot, "extensions");
+const userDataDirectory = path.join(temporaryRoot, "user-data");
 const vsix = path.join(extensionRoot, "dist", "diagram-as-code-vscode.vsix");
+
+async function disableWindowsInstallerMutex(vscodeExecutablePath) {
+  if (process.platform !== "win32") return;
+
+  // Archive builds cannot self-update, but still honor the machine-wide
+  // Inno Setup mutex used by the preinstalled VS Code on Windows runners.
+  const executableRoot = path.dirname(vscodeExecutablePath);
+  const entries = await readdir(executableRoot, { withFileTypes: true });
+  const roots = [
+    executableRoot,
+    ...entries.filter((entry) => entry.isDirectory()).map((entry) => (
+      path.join(executableRoot, entry.name)
+    )),
+  ];
+  for (const root of roots) {
+    const productJsonPath = path.join(root, "resources", "app", "product.json");
+    try {
+      const product = JSON.parse(await readFile(productJsonPath, "utf8"));
+      if (product.win32VersionedUpdate !== false) {
+        product.win32VersionedUpdate = false;
+        await writeFile(productJsonPath, `${JSON.stringify(product, null, 2)}\n`);
+      }
+      return;
+    } catch (error) {
+      if (error.code !== "ENOENT") throw error;
+    }
+  }
+  throw new Error(`Could not find product.json below ${executableRoot}.`);
+}
 
 try {
   await cp(path.join(extensionRoot, "test", "fixtures", "workspace"), workspace, {
     recursive: true,
   });
-  await runVSCodeCommand(["--install-extension", vsix, "--force"], {
+  const vscodeExecutablePath = await downloadAndUnzipVSCode({ version });
+  await disableWindowsInstallerMutex(vscodeExecutablePath);
+  const profileArgs = [
+    `--extensions-dir=${extensionsDirectory}`,
+    `--user-data-dir=${userDataDirectory}`,
+  ];
+  await runVSCodeCommand(["--install-extension", vsix, "--force", ...profileArgs], {
     version,
     spawn: { stdio: "inherit" },
   });
   delete process.env.ELECTRON_RUN_AS_NODE;
   await runTests({
-    version,
+    vscodeExecutablePath,
     extensionDevelopmentPath: extensionRoot,
     extensionTestsPath: path.join(extensionRoot, "dist-test", "suite.cjs"),
     launchArgs: [
       workspace,
+      ...profileArgs,
       "--disable-extensions",
       "--skip-welcome",
       "--skip-release-notes",
