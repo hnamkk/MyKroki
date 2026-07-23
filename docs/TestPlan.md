@@ -74,6 +74,7 @@
 | Supply chain | Product CI `npm sbom`, Anchore SBOM và Trivy | SBOM cho npm/Gateway/Kroki/Mermaid; image build từ commit hiện tại không có High/Critical, không bỏ qua advisory chưa có bản vá. |
 | GitHub Action unit/integration | `npm test --workspace=diagram-as-code-action --prefix product` | Input/path guard, planner rename/delete/full scan, output collision, API key, HTTP taxonomy, annotation, check read-only, generate rollback, artifact manifest và committed CommonJS bundle khởi động trên Node.js 24. |
 | GitHub Action runner E2E | Job Compose trong `.github/workflows/product-ci.yml` | Bundle thật gọi Gateway thật; current/stale/syntax/auth, artifact upload, PR generate guard và trusted generate. |
+| GitHub Action personal workflow | `.github/workflows/diagram-check.yml` trên self-hosted Windows | API key + Gateway local; PR trusted chạy changed-only, push `main`/manual full scan; condition loại fork và repository policy yêu cầu approval/tắt fork workflow. |
 | Pilot generation | `npm run pilot:generate --prefix product` | Shared config/planner gọi Gateway thật và tạo đúng bốn SVG Mermaid/C4/Graphviz/D2. |
 | Release bundle | `npm run release:prepare --prefix product` và `npm run release:verify --prefix product` | Đồng bộ version, VSIX/Action/Compose/config lock, SPDX SBOM, manifest và SHA-256; VSIX được package hai lần để so hash; tagged workflow bổ sung digest/SBOM ba image. |
 
@@ -255,6 +256,7 @@ Rate-limit integration test được phép dùng profile nhỏ hơn, ví dụ 6/
 | TC-GHA-012 | Change detector | PR chỉ đổi một source | Check PR rồi full render main. | PR chỉ render file ảnh hưởng; main render full theo policy. | P1 |
 | TC-GHA-013 | Invalid config | Config sai/path traversal | Chạy Action. | Fail trước render; chỉ field lỗi; không ghi ngoài workspace/output. | P0 |
 | TC-GHA-014 | Gateway failure | Gateway trả 429/503/504 | Chạy Action. | Exit khác 0; phân biệt lỗi, hiện requestId/Retry-After; không commit partial. | P0 |
+| TC-GHA-015 | Personal runner policy | Persistent self-hosted runner và Gateway local hoạt động; fork workflow bị tắt hoặc yêu cầu approval | Push `main`, mở PR trusted, rồi mô phỏng PR từ fork và không approve. | Push/PR trusted tạo check; PR changed-only; fork không được maintainer cấp job cho persistent runner. | P0 |
 
 ### 4.7 Release và pilot
 

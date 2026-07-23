@@ -14,7 +14,7 @@
 ---
 
 ifdef::env-github[]
-image:https://github.com/yuzutech/kroki/workflows/CI/badge.svg?branch=master[GitHub Actions build status, link=https://github.com/yuzutech/kroki/actions]
+image:https://github.com/hnamkk/MyKroki/actions/workflows/product-ci.yml/badge.svg?branch=main[Product CI status, link=https://github.com/hnamkk/MyKroki/actions/workflows/product-ci.yml]
 image:https://img.shields.io/badge/zulip-join_chat-brightgreen.svg[Zulip chat, link=https://kroki.zulipchat.com/]
 endif::[]
 
@@ -37,6 +37,9 @@ The link:product/vscode-extension/README.md[VS Code extension] provides live pre
 Problems diagnostics, SVG/PNG export, optional render-on-save, and Gateway connection checks.
 The complete local, VS Code, GitHub Action, pilot, release, and rollback procedure is in
 link:docs/E2E_SETUP_GUIDE.md[the E2E setup and acceptance guide].
+The default personal CI profile uses a trusted Windows self-hosted runner and local Gateway
+for automatic internal pull-request checks and post-merge checks on `main`. Heavy upstream
+Kroki and deployment-documentation workflows are scoped to owned paths or manual/nightly execution.
 
 Install and verify the product workspace independently:
 

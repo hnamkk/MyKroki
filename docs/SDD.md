@@ -480,12 +480,14 @@ Export và render-on-save tính path bằng shared planner, kiểm tra cả path
 | `AuthProvider` | `auto` ưu tiên OIDC khi có audience và fallback API key có cảnh báo; `oidc`, `api-key`, `none` là các mode explicit. PAT không được dùng. |
 | `GatewayClient` | Gọi cùng render API với VS Code. |
 | `OutputPlanner` | Tính deterministic output path. |
-| `CheckRunner` | Render, so sánh byte/hash và phát hiện stale output. |
+| `CheckRunner` | Render, so sánh output và phát hiện stale; SVG chuẩn hóa LF/CRLF để checkout Windows không tạo false positive, PNG giữ so sánh byte tuyệt đối. |
 | `AnnotationReporter` | Ghi lỗi file/line và job summary. |
 | `ArtifactPublisher` | Upload output mới khi check lỗi hoặc theo cấu hình. |
 | `GenerateRunner` | Render all-or-nothing, ghi output atomically trên trusted event và không tự commit. |
 
 Action được viết bằng TypeScript và bundle thành `dist/index.cjs` để người dùng không phải cài dependency. `check` là mode mặc định, staging artifact ngoài workspace và không có write path. OIDC cần `contents: read` cùng `id-token: write`; quyền này chỉ cho phép xin JWT, không cấp quyền ghi repository. Action gọi `getIDToken(oidcAudience)`, mask token và dùng nó làm Bearer credential trực tiếp. `generate` bị từ chối trên mọi `pull_request` event; chỉ ghi sau khi tất cả render thành công và rollback khi transaction file lỗi. API key và local no-auth vẫn được hỗ trợ; adapter commit là tính năng sau MVP.
+
+Profile cá nhân mặc định chạy Action trên persistent self-hosted runner Windows có label `diagram-renderer`, gọi Gateway local/private bằng API key và chỉ dành cho push `main`, manual dispatch hoặc PR nội bộ từ collaborator đáng tin cậy. Workflow loại head repository khác repository đích, đồng thời operator phải tắt/giữ approval bắt buộc cho fork workflows; job condition không thay thế repository security policy. Profile hosted/team/public-fork thay runner bằng GitHub-hosted hoặc ephemeral runner và dùng OIDC; contract render và `.diagram.yml` không đổi.
 
 ### 3.6 Shared configuration package
 

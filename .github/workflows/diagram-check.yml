@@ -1,6 +1,16 @@
 name: Diagram check
 
+concurrency:
+  group: diagram-check-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -9,6 +19,7 @@ permissions:
 jobs:
   diagrams:
     name: Verify generated diagrams
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, Windows, X64, diagram-renderer]
     timeout-minutes: 10
     steps:
@@ -21,4 +32,4 @@ jobs:
           gateway-url: ${{ vars.DIAGRAM_GATEWAY_URL }}
           api-key: ${{ secrets.DIAGRAM_API_KEY }}
           config-path: .diagram-pilot.yml
-          changed-only: "false"
+          changed-only: "true"

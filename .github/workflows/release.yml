@@ -1,4 +1,4 @@
-name: Release
+name: Upstream Kroki Release
 run-name: Release v${{ inputs.release_version }} by ${{ github.actor }}
 
 on:

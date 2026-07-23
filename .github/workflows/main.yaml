@@ -1,4 +1,4 @@
-name: CI
+name: Upstream Kroki CI
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
@@ -6,15 +6,54 @@ concurrency:
 
 on:
   push:
-    paths-ignore:
-      - 'docs/**'
     branches:
       - main
+    paths:
+      - '.github/workflows/main.yaml'
+      - '.mvn/**'
+      - 'bpmn/**'
+      - 'bytefield/**'
+      - 'ci/**'
+      - 'dbml/**'
+      - 'diagrams.net/**'
+      - 'docker-bake.hcl'
+      - 'excalidraw/**'
+      - 'mvnw'
+      - 'mvnw.cmd'
+      - 'nomnoml/**'
+      - 'package-lock.json'
+      - 'package.json'
+      - 'pom.xml'
+      - 'server/**'
+      - 'Taskfile.yml'
+      - 'tikz/**'
+      - 'vega/**'
+      - 'wavedrom/**'
   pull_request:
-    paths-ignore:
-      - 'docs/**'
     branches:
-      - '*'
+      - main
+    paths:
+      - '.github/workflows/main.yaml'
+      - '.mvn/**'
+      - 'bpmn/**'
+      - 'bytefield/**'
+      - 'ci/**'
+      - 'dbml/**'
+      - 'diagrams.net/**'
+      - 'docker-bake.hcl'
+      - 'excalidraw/**'
+      - 'mvnw'
+      - 'mvnw.cmd'
+      - 'nomnoml/**'
+      - 'package-lock.json'
+      - 'package.json'
+      - 'pom.xml'
+      - 'server/**'
+      - 'Taskfile.yml'
+      - 'tikz/**'
+      - 'vega/**'
+      - 'wavedrom/**'
+  workflow_dispatch:
   workflow_call:
     inputs:
       build_multiarch:

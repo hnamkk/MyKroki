@@ -20,7 +20,7 @@ Developer sửa file trong `docs/diagrams`, mở preview và dùng `Diagram: Exp
 5. Copy `product/.diagram.example.yml` thành `.diagram.yml` ở repo sử dụng.
 6. Build/cài VSIX từ `product/vscode-extension/dist/diagram-as-code-vscode.vsix`.
 7. Cấu hình `diagramAsCode.gatewayUrl`, lưu key bằng `Diagram: Set Gateway API Key`, rồi chạy `Diagram: Check Gateway Connection`.
-8. Thiết lập workflow theo [GitHub Action README](github-action/README.md); hosted Gateway ưu tiên GitHub OIDC, API key là fallback.
+8. Với profile cá nhân, đăng ký self-hosted runner `diagram-renderer`, đặt Gateway URL/API key bằng Actions Variable/Secret và dùng workflow tự động trên PR nội bộ + push `main`; profile hosted/team tiếp tục ưu tiên OIDC.
 
 Kịch bản setup và nghiệm thu từ đầu đến cuối nằm trong [E2E Setup Guide](../docs/E2E_SETUP_GUIDE.md). Fixture bốn engine dùng cho pilot nằm tại `product/examples/pilot-repository`.
 

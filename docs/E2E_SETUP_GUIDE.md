@@ -261,11 +261,30 @@ Workflow `.github/workflows/diagram-check.yml` dùng `.diagram-pilot.yml` ở ro
 
 1. Đặt Actions variable `DIAGRAM_GATEWAY_URL=http://localhost:9000`.
 2. Đặt Actions secret `DIAGRAM_API_KEY` bằng plaintext key `dg_...`.
-3. Giữ `run.cmd` và Docker Compose hoạt động.
-4. Chạy workflow `Diagram check` bằng `workflow_dispatch` trên branch cần nghiệm thu.
-5. Kết quả đạt khi bốn diagram được kiểm tra, `stale-count=0` và artifact preview được upload.
+3. Đăng ký runner với labels `self-hosted`, `Windows`, `X64`, `diagram-renderer`.
+4. Giữ `run.cmd` và Docker Compose hoạt động; cài runner thành Windows Service nếu cần nhận job liên tục.
+5. Tạo PR nội bộ vào `main`, push/merge vào `main`, hoặc chạy `workflow_dispatch`.
+6. Kết quả đạt khi diagram liên quan được kiểm tra, `stale-count=0` và artifact preview được upload.
 
-### 7.3 Tạo repository pilot thật
+Workflow không dùng path filter, vì một required workflow bị skip có thể để PR chờ check vô thời hạn. Action tự kết thúc nhanh khi PR không ảnh hưởng diagram. Push vào `main` và manual dispatch thực hiện full scan; PR chỉ kiểm tra source bị ảnh hưởng, trừ khi config/lock thay đổi.
+
+Điều kiện job loại PR có head repository khác repository đích trong luồng bình thường, nhưng không phải ranh giới bảo mật duy nhất. Profile persistent self-hosted chỉ dành cho private repository hoặc collaborator đáng tin cậy. Với public repository, cấu hình Actions Settings để tắt fork workflows hoặc yêu cầu phê duyệt mọi outside collaborator và không phê duyệt chúng trên runner này; public/fork CI thực sự phải chuyển sang GitHub-hosted hoặc ephemeral runner với OIDC.
+
+### 7.3 Chính sách CI của MyKroki
+
+| Workflow | Tự động khi nào | Vai trò |
+|---|---|---|
+| `Diagram check` | PR nội bộ/trusted vào `main`, push `main`; có manual | Required check cá nhân, chạy trên self-hosted runner và Gateway local. |
+| `Product CI` | PR/push `main` khi product, fork integration hoặc workflow product đổi | Typecheck, unit/contract, Java fork regression, Extension Host và Compose E2E. |
+| `Upstream Kroki CI` | PR/push `main` khi Java server, renderer cục bộ, build/smoke packaging đổi; có manual/call | Giữ khả năng tương thích Kroki mà không chạy cho thay đổi product/docs thuần túy. |
+| `Upstream Mermaid CI` | PR/push `main` khi Mermaid hoặc browser-instance đổi | Unit/lint riêng cho companion Mermaid. |
+| `Upstream Deployment Docs CI` | Manual | Kiểm tra các ví dụ Kind/Compose nặng khi maintainer yêu cầu. |
+| `Upstream Kroki CI (nightly)` | Hằng đêm | Full multi-architecture upstream smoke. |
+| Release/security workflows | Tag, lịch hoặc manual tương ứng | Không tạo check cho push/PR thông thường. |
+
+Push feature branch không chạy thêm một job giống hệt khi chưa có PR. Khi PR đã mở, mỗi push tạo event `pull_request/synchronize` và chạy `Diagram check`; sau merge, push `main` full-scan lại một lần. Cách này tránh hai check trùng nhau trên cùng commit PR.
+
+### 7.4 Tạo repository pilot thật
 
 1. Tạo repository trống.
 2. Copy nội dung trong `product/examples/pilot-repository/` vào root repository.
