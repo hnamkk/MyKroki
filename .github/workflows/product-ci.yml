@@ -220,24 +220,32 @@ jobs:
           artifact-name: diagram-mermaid-sbom.spdx.json
           output-file: product/test-results/diagram-mermaid.spdx.json
           format: spdx-json
+      - name: Install pinned Trivy scanner
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.69.3
+          cache: true
       - name: Scan Gateway image for fixable high vulnerabilities
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
         with:
           image-ref: diagram-as-code-gateway:local
           severity: CRITICAL,HIGH
           exit-code: "1"
+          skip-setup-trivy: true
       - name: Scan Kroki image for fixable high vulnerabilities
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
         with:
           image-ref: yuzutech/kroki:product-ci
           severity: CRITICAL,HIGH
           exit-code: "1"
+          skip-setup-trivy: true
       - name: Scan Mermaid image for fixable high vulnerabilities
         uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
         with:
           image-ref: yuzutech/kroki-mermaid:product-ci
           severity: CRITICAL,HIGH
           exit-code: "1"
+          skip-setup-trivy: true
       - name: Verify container runtime confinement
         env:
           CONTAINER_POLICY_TARGETS: diagram-product-ci-gateway-1,diagram-product-ci-kroki-1,diagram-product-ci-mermaid-1
