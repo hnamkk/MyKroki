@@ -7,6 +7,7 @@
 - Add Gateway health/engine discovery, actionable connection checks, and supported-format selection.
 - Add zoom, fit, and reset controls under a nonce-based strict webview CSP.
 - Add packaged VSIX installation and Extension Host E2E coverage for minimum and current VS Code versions.
+- Fix preview/render-on-save request interference and cross-platform LF/CRLF assumptions in the Windows Extension Host test.
 
 ## 0.1.0
 

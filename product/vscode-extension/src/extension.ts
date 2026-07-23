@@ -257,7 +257,11 @@ class DiagramController implements vscode.Disposable {
     });
   }
 
-  async render(document: vscode.TextDocument, formatOverride: OutputFormat = "svg"): Promise<RenderOutput> {
+  async render(
+    document: vscode.TextDocument,
+    formatOverride: OutputFormat = "svg",
+    lane: "preview" | "output" = "preview",
+  ): Promise<RenderOutput> {
     if (!detectDiagramEngine(document.uri.fsPath)) {
       throw new Error(`The active file is not a supported ${SUPPORTED_EXTENSIONS} diagram.`);
     }
@@ -269,7 +273,7 @@ class DiagramController implements vscode.Disposable {
         project.config,
         formatOverride,
       );
-      const resource = `${document.uri.toString()}\0${request.format}`;
+      const resource = `${document.uri.toString()}\0${request.format}\0${lane}`;
       const fingerprint = `${project.gatewayUrl}\0${project.apiKey ?? ""}`;
       let entry = this.coordinators.get(resource);
       if (!entry || entry.fingerprint !== fingerprint) {
@@ -452,7 +456,7 @@ class DiagramController implements vscode.Disposable {
       throw new Error("The active diagram is not included by .diagram.yml sources.");
     }
     const outputPath = resolveWorkspaceOutput(project.folder.uri.fsPath, outputRelativePath);
-    const output = await this.render(document, format);
+    const output = await this.render(document, format, "output");
     const outputUri = vscode.Uri.file(outputPath);
     const temporaryUri = vscode.Uri.file(`${outputPath}.tmp-${process.pid}-${Date.now()}`);
     await vscode.workspace.fs.createDirectory(vscode.Uri.file(path.dirname(outputPath)));
