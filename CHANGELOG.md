@@ -28,7 +28,7 @@ versioned entry and uses it as the GitHub release notes.
 
 ### Changed
 
-- Make the personal/private CI profile use an automatic self-hosted Diagram check for internal pull requests and `main` pushes, block fork PRs from the persistent runner, scope heavy upstream Kroki CI to owned paths, and move deployment-docs/upstream notification workflows to manual execution.
+- Make the personal/private CI profile use an automatic self-hosted Diagram check for internal pull requests and `main` pushes, block fork PRs from the persistent runner, scope heavy upstream Kroki CI to owned paths, move deployment-docs/upstream notification workflows to manual execution, and split quick PR gates from full main/manual/nightly container acceptance.
 - Reduce container CI time by fixing the false multi-architecture build condition, loading native images only once before smoke tests, persisting BuildKit layers with a stable Docker-input cache key, and bounding the build and smoke-test steps with diagnostics on failure.
 - Make Product CI build Kroki and Mermaid from the same checkout, trigger on fork/renderer changes, bound every E2E stage, and persist fork image layers.
 - Make Node SEA renderer stages reproducible with lockfile installs, optional native tooling, and host-independent lint input.

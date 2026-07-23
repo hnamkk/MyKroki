@@ -51,10 +51,10 @@
 |---|---|---|
 | Unit | Mọi pull request | Không phụ thuộc network/process ngoài; lỗi làm fail PR. |
 | Contract/integration | PR thay đổi module liên quan | Fixture và renderer version được pin; lỗi P0 làm fail PR. |
-| Docker E2E | PR vào main và nightly | Lưu log/artifact khi lỗi. |
+| Docker E2E | Push `main`, manual candidate và nightly | PR dùng quick gate; full Compose lưu log/artifact khi lỗi và phải chạy trước release. |
 | VS Code E2E | PR extension: Linux trên version tối thiểu/Stable và Windows Stable | Extension Host headless, cài VSIX thật; Compose chạy thêm smoke client với Gateway thật. |
 | GitHub E2E | Test repo trước release | Tách public/private; không dùng production credential. |
-| Performance/security | Nightly và release candidate | Môi trường cố định; lưu p50/p95/p99 và bằng chứng redaction. |
+| Performance/security | Push `main`, manual release candidate và nightly | Môi trường cố định; lưu p50/p95/p99 và bằng chứng redaction. |
 | Release acceptance | Mỗi product tag candidate | Verify bundle/checksum/SBOM, pilot bốn engine, ba full Product CI xanh và rollback rehearsal. |
 
 ### 2.3 Cổng tự động cho renderer MVP
@@ -78,7 +78,7 @@
 | Pilot generation | `npm run pilot:generate --prefix product` | Shared config/planner gọi Gateway thật và tạo đúng bốn SVG Mermaid/C4/Graphviz/D2. |
 | Release bundle | `npm run release:prepare --prefix product` và `npm run release:verify --prefix product` | Đồng bộ version, VSIX/Action/Compose/config lock, SPDX SBOM, manifest và SHA-256; VSIX được package hai lần để so hash; tagged workflow bổ sung digest/SBOM ba image. |
 
-Các cổng trên chạy trong job Compose của Product CI trên image Kroki/Mermaid được build từ cùng checkout. Job và từng lệnh có deadline; HTTP E2E có request timeout riêng và runner tôn trọng `Retry-After` khi acceptance vượt burst rate limit.
+Các cổng full trên chạy trong job Compose của Product CI trên image Kroki/Mermaid được build từ cùng checkout. Compose bị skip trên `pull_request` để PR nhận feedback nhanh; nó chạy trên push `main` và `workflow_dispatch` của branch candidate. Job và từng lệnh có deadline; HTTP E2E có request timeout riêng và runner tôn trọng `Retry-After` khi acceptance vượt burst rate limit.
 
 OIDC (`TC-GHA-007`) đã được triển khai ở Phase 5. Auto-commit (`TC-GHA-010..011`) vẫn là `Could` sau MVP và không chặn Phase 7; MVP `generate` chỉ cập nhật workspace trên trusted event.
 

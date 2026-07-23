@@ -485,7 +485,7 @@ Một work package chỉ được hoàn thành khi:
 | In-memory state khi scale | Rate/cache không nhất quán | Một replica MVP, adapter Redis sau số liệu | Yêu cầu HA hoặc nhiều replica production. |
 | CI E2E tốn thời gian | Feedback chậm/flaky | Tách PR smoke và nightly soak, cache image | PR gate thường xuyên vượt 15 phút hoặc flaky. |
 
-Baseline vận hành cá nhân giữ `Diagram check` tự động cho PR nội bộ và push `main` trên self-hosted runner/Gateway local. Upstream Kroki CI chỉ tự kích hoạt khi server, renderer cục bộ hoặc packaging liên quan thay đổi; Mermaid giữ workflow theo path riêng; deployment docs và thông báo hạ tầng upstream chuyển sang manual. Full multi-architecture Kroki smoke tiếp tục chạy nightly, còn Product CI giữ quality/contract/platform gates theo vùng `product` và fork integration.
+Baseline vận hành cá nhân giữ `Diagram check` tự động cho PR nội bộ và push `main` trên self-hosted runner/Gateway local. Upstream Kroki CI chỉ tự kích hoạt khi server, renderer cục bộ hoặc packaging liên quan thay đổi; Mermaid giữ workflow theo path riêng; deployment docs và thông báo hạ tầng upstream chuyển sang manual. PR dùng quick gates: Product quality/Java/Extension Host và Upstream Java regression. Product Compose cùng Upstream image build/smoke chỉ chạy push `main`, manual candidate hoặc nightly call; ba full CI evidence không được lấy từ PR quick runs.
 
 ## 18. Báo cáo tiến độ
 

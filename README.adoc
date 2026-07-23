@@ -40,6 +40,8 @@ link:docs/E2E_SETUP_GUIDE.md[the E2E setup and acceptance guide].
 The default personal CI profile uses a trusted Windows self-hosted runner and local Gateway
 for automatic internal pull-request checks and post-merge checks on `main`. Heavy upstream
 Kroki and deployment-documentation workflows are scoped to owned paths or manual/nightly execution.
+Pull requests use quick quality/Java/Extension checks; full Product Compose, container security,
+performance, recovery, and upstream image smoke run on `main`, manual candidates, or nightly.
 
 Install and verify the product workspace independently:
 

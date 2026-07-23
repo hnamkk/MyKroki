@@ -5,6 +5,7 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -162,6 +163,7 @@ jobs:
           VSCODE_TEST_VERSION: ${{ matrix.vscode-version }}
 
   compose:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
