@@ -31,7 +31,7 @@ versioned entry and uses it as the GitHub release notes.
 ### Fixed
 
 - Make the bundled GitHub Action start correctly on the Node.js 24 runner by preserving `import.meta.url` semantics in its CommonJS bundle.
-- Stabilize the VS Code Windows Extension Host gate by isolating VS Code mutexes, separating preview and render-on-save request lanes, and making the render-on-save E2E assertions line-ending agnostic.
+- Keep VS Code preview refreshes from superseding render-on-save writes, and make the Windows Extension Host E2E assertions independent of LF/CRLF line endings.
 
 ## [0.31.1] - 2026-07-15
 
