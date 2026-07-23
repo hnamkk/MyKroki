@@ -42,6 +42,7 @@ versioned entry and uses it as the GitHub release notes.
 - Keep VS Code preview refreshes from superseding render-on-save writes, and make the Windows Extension Host E2E assertions independent of LF/CRLF line endings.
 - Make dependency recovery wait for a successful Mermaid render after backend restart instead of failing on a transient 503.
 - Make VSIX archives byte-for-byte reproducible by normalizing ZIP timestamps and file ordering through `SOURCE_DATE_EPOCH`.
+- Prevent false stale SVG reports on Windows self-hosted runners by normalizing checkout line endings during GitHub Action comparison while retaining byte-exact PNG checks.
 
 ## [0.31.1] - 2026-07-15
 
