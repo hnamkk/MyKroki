@@ -22,7 +22,16 @@ Developer sửa file trong `docs/diagrams`, mở preview và dùng `Diagram: Exp
 7. Cấu hình `diagramAsCode.gatewayUrl`, lưu key bằng `Diagram: Set Gateway API Key`, rồi chạy `Diagram: Check Gateway Connection`.
 8. Thiết lập workflow theo [GitHub Action README](github-action/README.md); hosted Gateway ưu tiên GitHub OIDC, API key là fallback.
 
-`npm run test:isolation` dành cho fault injection: dừng riêng Mermaid companion trước khi chạy và khởi động lại sau khi kiểm tra.
+Các quality gate Phase 6 chạy trên cùng stack:
+
+```powershell
+npm run test:security
+npm run test:performance
+npm run test:soak
+npm run test:container-policy
+```
+
+`npm run test:recovery` dành cho fault injection. Dừng riêng Mermaid, đặt `RECOVERY_EXPECT=degraded` để kiểm tra isolation, sau đó start/restart dependency và chạy lại với `RECOVERY_EXPECT=ready`. Các suite ghi report JSON khi đặt `QUALITY_REPORT_PATH`.
 
 Extension Host E2E được chạy bằng `npm --workspace=diagram-as-code-vscode run test:e2e`; đặt `VSCODE_TEST_VERSION=1.100.0` để kiểm tra version tối thiểu.
 

@@ -1,14 +1,49 @@
 import assert from "node:assert/strict";
+import { createServer } from "node:http";
 import test from "node:test";
 
 import { InvalidRenderOutput, RenderOutputTooLarge } from "../dist/output-validator.js";
 import {
   KrokiRenderer,
   RendererFailure,
+  RendererTimeout,
   RendererUnavailable,
   parseRendererFailure,
   readResponseBody,
 } from "../dist/renderer.js";
+
+test("aborts a hanging backend and releases the client for a subsequent render", async () => {
+  let requests = 0;
+  const server = createServer((request, response) => {
+    request.resume();
+    requests += 1;
+    if (requests === 1) return;
+    response.writeHead(200, { "content-type": "image/svg+xml" });
+    response.end("<svg><text>recovered</text></svg>");
+  });
+  await new Promise<void>((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", resolve);
+  });
+  try {
+    const address = server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind a TCP port");
+    const renderer = new KrokiRenderer(`http://127.0.0.1:${address.port}`, 50, 1_000);
+    await assert.rejects(
+      renderer.render({ engine: "mermaid", format: "svg", source: "flowchart LR; A-->B" }),
+      RendererTimeout,
+    );
+    const recovered = await renderer.render({
+      engine: "mermaid",
+      format: "svg",
+      source: "flowchart LR; B-->C",
+    });
+    assert.match(recovered.toString("utf8"), /recovered/);
+  } finally {
+    server.closeAllConnections();
+    await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+  }
+});
 
 test("rejects renderer response from Content-Length before buffering", async () => {
   const response = new Response("small", { headers: { "content-length": "100" } });

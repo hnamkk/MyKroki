@@ -47,6 +47,19 @@ With the product Compose stack running and `DIAGRAM_API_KEY` configured, run the
 
  $ npm run test:renderers --prefix product
 
+Phase 6 reliability gates can be run against the same reference stack:
+
+ $ npm run test:security --prefix product
+ $ npm run test:performance --prefix product
+ $ npm run test:soak --prefix product
+ $ npm run test:recovery --prefix product
+ $ npm run test:container-policy --prefix product
+
+The Compose deployment runs Gateway, Kroki, and Mermaid as non-root containers with
+read-only root filesystems, dropped capabilities, CPU/memory/PID limits, and restart
+policies. Tune the `*_CPU_LIMIT`, `*_MEMORY_LIMIT`, and `*_PIDS_LIMIT` variables in
+`product/deploy/.env.example` for the target host.
+
 == Usage
 
 Kroki uses a simple algorithm (deflate + base64) to encode your diagram in the URL:

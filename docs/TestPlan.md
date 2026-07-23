@@ -61,9 +61,15 @@
 |---|---|---|
 | Gateway unit và contract | `npm test --prefix product` | Capability metadata single-flight/TTL, version theo engine, error normalization, URI/body/output limit, weighted TTL cache, cache degradation và auth. |
 | Renderer acceptance | `npm run test:renderers --prefix product` khi Compose đang chạy | `TC-REN-001..009`, `TC-VAL-009..012`, PNG signature/dimension, C4/DOT alias và secure include. |
-| Determinism | `product/scripts/determinism-test.mjs` trong Gateway container | `TC-REN-012`, C4 và Graphviz/DOT equivalence, cache bypass. |
-| Failure isolation | Dừng Mermaid rồi chạy `npm run test:isolation --prefix product` | `TC-REN-011`, `NFR-AVL-002`; PlantUML, Graphviz và D2 vẫn render. |
+| Determinism | `product/scripts/determinism-test.mjs` trong Gateway container với `DETERMINISM_REPORT` và `DETERMINISM_BASELINE` | `TC-REN-012`, C4 và Graphviz/DOT equivalence, cache bypass và hash không đổi sau restart. |
+| Failure isolation/recovery | Dừng Mermaid rồi chạy `npm run test:recovery --prefix product` với `RECOVERY_EXPECT=degraded`; start/restart và chạy lại với `ready` | `TC-REN-011`, `TC-OPS-002`, `NFR-AVL-002..005`; engine độc lập vẫn render và readiness tự phục hồi. |
+| Security abuse | `npm run test:security --prefix product` | Malformed body, auth, oversized/decompression bomb, encoded input, traversal và redaction; kết hợp renderer acceptance cho include security. |
+| Performance | `npm run test:performance --prefix product` | `TC-OPS-001`, `TC-PERF-001..003`; xuất JSON và fail khi ngưỡng Must bị vi phạm. |
+| Concurrency soak | `npm run test:soak --prefix product` | Tải no-store dài, active/queue bounds, permit drain và container stats trước/sau. |
+| Container policy | `npm run test:container-policy --prefix product` | Non-root, read-only rootfs, CPU/RAM/PID limits, cap-drop, no-new-privileges và restart policy. |
+| Flaky control | `npm run test:repeat --prefix product -- --attempts 3 -- <command>` | Deadline/report theo từng vòng; không quarantine P0. |
 | Kroki resource cleanup | Java 25 `CommanderTest,DelegatorTest` | Process tree cleanup, companion deadline và stack-trace suppression. |
+| Supply chain | Product CI `npm sbom`, Anchore SBOM và Trivy | SBOM cho npm/Gateway/Kroki/Mermaid; image build từ commit hiện tại không có High/Critical, không bỏ qua advisory chưa có bản vá. |
 | GitHub Action unit/integration | `npm test --workspace=diagram-as-code-action --prefix product` | Input/path guard, planner rename/delete/full scan, output collision, API key, HTTP taxonomy, annotation, check read-only, generate rollback, artifact manifest và committed CommonJS bundle khởi động trên Node.js 24. |
 | GitHub Action runner E2E | Job Compose trong `.github/workflows/product-ci.yml` | Bundle thật gọi Gateway thật; current/stale/syntax/auth, artifact upload, PR generate guard và trusted generate. |
 
@@ -100,6 +106,7 @@ OIDC (`TC-GHA-007`) và auto-commit (`TC-GHA-010..011`) vẫn là phạm vi phas
 | VS Code E2E | VS Code stable và phiên bản tối thiểu hỗ trợ; Windows/Linux | Webview, SecretStorage, filesystem. |
 | GitHub E2E | GitHub-hosted Ubuntu; public/private test repo; protected branch | Permission, secret, OIDC, artifact, commit. |
 | Performance | Linux runner riêng, tài nguyên cố định, không có job khác | Đo p95 và workspace 100 diagram. |
+| CI quality matrix | Ubuntu 24.04 + Node.js 24 + Java 25; Windows 2025 cho Extension/path | Xác nhận runtime/OS constraints và giữ report làm artifact. |
 
 ### 3.2 Cấu hình baseline
 
@@ -110,6 +117,7 @@ OIDC (`TC-GHA-007`) và auto-commit (`TC-GHA-010..011`) vẫn là phạm vi phas
 | Rate limit | 60 request/phút/principal, burst 10 |
 | Cache | In-memory LRU, TTL 24 giờ |
 | VS Code debounce | 400 ms |
+| Container confinement | Non-root, read-only rootfs, drop all capabilities, no-new-privileges; Gateway 512 MiB/1 CPU/256 PID; Kroki 1 GiB/2 CPU/256 PID; Mermaid 1 GiB/1 CPU/256 PID |
 
 Rate-limit integration test được phép dùng profile nhỏ hơn, ví dụ 6/phút và burst 2, để chạy xác định nhưng phải giữ nguyên semantics.
 

@@ -1076,8 +1076,13 @@ Manifest là `Should`; MVP vẫn có thể render lại và so output hash trự
 | `METRICS_ENABLED` | `true` | Có đăng ký `/metrics` hay không |
 | `LOG_LEVEL` | `info` | Mức Pino/Fastify log |
 | `KROKI_BASE_URL` | `http://kroki:8000` | Internal backend URL |
+| `GATEWAY_PIDS_LIMIT` / `GATEWAY_MEMORY_LIMIT` / `GATEWAY_CPU_LIMIT` | `256` / `512m` / `1.0` | Resource confinement cho Gateway container |
+| `KROKI_PIDS_LIMIT` / `KROKI_MEMORY_LIMIT` / `KROKI_CPU_LIMIT` | `256` / `1g` / `2.0` | Resource confinement cho Kroki JVM và local renderers |
+| `MERMAID_PIDS_LIMIT` / `MERMAID_MEMORY_LIMIT` / `MERMAID_CPU_LIMIT` | `256` / `1g` / `1.0` | Resource confinement cho Chromium companion |
 
 Production profile phải fail fast nếu bật no-auth trên non-loopback interface, nếu thiếu OIDC audience khi bật OIDC, hoặc nếu cấu hình backend URL dùng public/untrusted scheme không được allowlist.
+
+Reference Compose chạy cả ba container bằng non-root user, read-only root filesystem, tmpfs giới hạn cho dữ liệu tạm, `cap_drop: ALL`, `no-new-privileges`, PID/memory/CPU limits và restart policy. Chỉ Gateway publish port; Kroki và Mermaid ở private rendering network.
 
 ## 9. Kiểm thử kiến trúc tối thiểu
 
@@ -1093,6 +1098,8 @@ Kế hoạch kiểm thử chi tiết, môi trường tham chiếu và danh sách
 | VS Code E2E | Unsaved preview, stale response, diagnostic, export và SecretStorage. |
 | GitHub Action E2E | Check pass/fail, stale output, artifact, API key và OIDC policy. |
 | Deployment smoke | Docker Compose, health/readiness và chỉ Gateway được expose. |
+| Reliability | Performance/workspace benchmark, concurrency soak, dependency kill/restart, deterministic hash qua restart và flaky-test repetition có deadline. |
+| Supply chain | SBOM cho npm và ba image runtime; Trivy chặn mọi High/Critical trên image build từ commit; runtime image loại compiler/header packages sau assembly; GitHub Actions bên thứ ba pin commit SHA. |
 
 ## 10. Điểm cần xác nhận trước implementation
 

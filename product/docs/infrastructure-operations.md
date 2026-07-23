@@ -28,6 +28,16 @@ Kiểm tra `http://localhost:9000/health/live` cho tiến trình Gateway và `/h
 
 Gateway MVP không có database hay volume dữ liệu. Cache nằm trong RAM và mất khi restart; source và SVG chuẩn vẫn nằm trong Git. Cache mặc định có TTL 24 giờ, tổng trọng lượng tối đa 256 MiB và chỉ lưu từng output không quá 5 MiB. Điều chỉnh lần lượt bằng `CACHE_TTL_MS`, `CACHE_MAX_BYTES` và `CACHE_MAX_ITEM_BYTES`; `CACHE_MAX_ENTRIES` vẫn là chặn bổ sung theo số entry.
 
+Reference Compose chạy cả ba service bằng non-root user, read-only root filesystem, `cap_drop: ALL`, `no-new-privileges` và restart policy. Các giới hạn mặc định:
+
+| Service | CPU | Memory | PID |
+|---|---:|---:|---:|
+| Gateway | 1.0 | 512 MiB | 256 |
+| Kroki | 2.0 | 1 GiB | 256 |
+| Mermaid | 1.0 | 1 GiB | 256 |
+
+Điều chỉnh bằng các biến `GATEWAY_*_LIMIT`, `KROKI_*_LIMIT` và `MERMAID_*_LIMIT` trong `.env`; chỉ tăng sau khi benchmark trên host đích.
+
 ## Cấp, xoay và thu hồi API key
 
 Gateway đọc `DIAGRAM_API_KEY_RECORDS` dưới dạng JSON. Mỗi record có `id`, SHA-256 `verifier`, `scopes`, `cachePartition` và `status` (`active` hoặc `revoked`). Gateway không lưu plaintext key. Lệnh sau in plaintext đúng một lần cùng record để lưu ở phía Gateway:
@@ -76,3 +86,18 @@ Gateway mặc định tin issuer/JWKS chính thức của GitHub. Các biến `G
 Theo dõi HTTP 5xx, thời gian render, memory/container restart, bulkhead queue và cache hit/miss tại `/metrics`. Endpoint metrics chỉ tồn tại khi `METRICS_ENABLED=true`; khi Gateway truy cập được từ Internet, reverse proxy phải giới hạn endpoint này cho mạng vận hành. Cảnh báo khi `/health/ready` lỗi liên tục trên 2 phút. LRU, single-flight và token bucket chỉ có hiệu lực trong từng Gateway replica; MVP nên bắt đầu với một replica.
 
 Các giới hạn mặc định là source 1 MiB, output 10 MiB, cache 256 MiB/5 MiB mỗi item/TTL 24 giờ, timeout 15 giây, 4 render đồng thời và queue 20 request. Gateway fail fast nếu giá trị nằm ngoài khoảng an toàn, cache item limit lớn hơn tổng cache limit hoặc production bật no-auth trên địa chỉ non-loopback.
+
+## Quality gate vận hành
+
+Sau thay đổi image hoặc cấu hình tài nguyên, chạy smoke/renderer acceptance trước, rồi chạy:
+
+```powershell
+$env:DIAGRAM_GATEWAY_URL = "http://localhost:9000"
+$env:DIAGRAM_API_KEY = "<plaintext-test-key>"
+npm --prefix .. run test:security
+npm --prefix .. run test:performance
+npm --prefix .. run test:soak
+npm --prefix .. run test:container-policy
+```
+
+Để diễn tập recovery, dừng Mermaid và chạy `test:recovery` với `RECOVERY_EXPECT=degraded`; khởi động lại service rồi chạy với `RECOVERY_EXPECT=ready`. Readiness phải tự trở về 200, không sửa cache hay restart Gateway thủ công.

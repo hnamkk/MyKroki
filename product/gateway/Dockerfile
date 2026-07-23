@@ -10,7 +10,9 @@ COPY gateway/package.json gateway/tsconfig.json ./gateway/
 COPY gateway/src ./gateway/src
 COPY scripts ./scripts
 
-RUN npm ci && npm --workspace=@diagram-as-code/gateway run build
+RUN npm ci \
+  && npm --workspace=@diagram-as-code/gateway run build \
+  && npm prune --omit=dev
 
 FROM node:24-alpine AS runtime
 
@@ -23,6 +25,8 @@ COPY --from=build /app/packages/contracts/dist ./packages/contracts/dist
 COPY --from=build /app/gateway/package.json ./gateway/package.json
 COPY --from=build /app/gateway/dist ./gateway/dist
 COPY --from=build /app/scripts ./scripts
+
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
 
 USER node
 EXPOSE 9000

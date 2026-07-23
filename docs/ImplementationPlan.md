@@ -60,7 +60,7 @@ Sau khi hoàn thành OIDC/repository policy ở Phase 5, phần còn lại của
 | 3 | GitHub Action MVP | Hoàn thiện `check`, artifact, annotation và `generate` | Phase 1, 2 | Đã hoàn thành |
 | 4 | VS Code Extension MVP | Hoàn thiện diagnostics, export, render-on-save và UX preview | Phase 1, 2 | Đã hoàn thành |
 | 5 | OIDC và policy | Hỗ trợ GitHub public/private không phụ thuộc repository secret | Phase 1, 3 | Đã hoàn thành |
-| 6 | Reliability và quality gates | E2E, performance, security và flaky-test control | Phase 1-5 | 6-10 ngày công |
+| 6 | Reliability và quality gates | E2E, performance, security và flaky-test control | Phase 1-5 | Triển khai hoàn tất; chờ 3 lần full CI xanh liên tiếp |
 | 7 | Pilot và phát hành | Tài liệu, packaging, upgrade/rollback và pilot repository | Phase 6 | 4-7 ngày công |
 | 8 | Sau MVP | Redis, playground, trusted commit và renderer mở rộng | Phase 7 | Lập kế hoạch riêng |
 
@@ -324,6 +324,10 @@ Cho GitHub Action gọi hosted Gateway mà không cần repository secret, đồ
 
 Chứng minh hệ thống ổn định trong điều kiện tải, lỗi dependency và quy trình CI lặp lại.
 
+### Trạng thái
+
+Đã hoàn tất triển khai ngày 2026-07-23. Reference stack đã vượt qua renderer acceptance, security abuse, performance, soak, dependency recovery, deterministic-output và container-policy gates trên các image được build từ cùng source. Phase gate chỉ được đánh dấu `Done` sau khi branch có ba lần full Product CI liên tiếp xanh theo exit criteria; đây là bằng chứng CI còn phải thu thập, không phải hạng mục code còn thiếu.
+
 ### Work packages
 
 | ID | Công việc | Deliverable | Requirement/Test | Priority |
@@ -337,6 +341,31 @@ Chứng minh hệ thống ổn định trong điều kiện tải, lỗi depende
 | P6-07 | Flaky control | Lặp unit/integration, timeout budget, lưu report; quarantine không được dùng cho P0 | Test Plan 2.2 | P0 |
 | P6-08 | CI matrix | Node 24, Java 25, Linux runner; Windows cho Extension/path tests | Constraints/Test Environment | P0 |
 | P6-09 | Supply chain | Audit dependency, image scan, SBOM/checksum, pinned Action/image references | NFR-SEC-005, NFR-CMU-003 | P1 |
+
+### Deliverable đã triển khai
+
+| Work package | Bằng chứng triển khai |
+|---|---|
+| P6-01 | Product CI dựng Gateway/Kroki/Mermaid từ cùng checkout và chạy smoke, renderer acceptance, Action/VS Code Gateway smoke cho JSON, text POST, encoded GET, SVG và PNG được hỗ trợ. |
+| P6-02 | `test:recovery` kiểm tra liveness/readiness, render độc lập khi Mermaid down, tự phục hồi sau start/restart; Gateway integration test dùng backend HTTP treo thật để xác nhận timeout và slot kế tiếp hoạt động; cache-failure degradation được giữ trong Gateway test. |
+| P6-03 | `test:performance` xuất JSON cho health p95, cache-hit p95, render từng engine và workspace 100 diagram; ngưỡng Must làm fail test. |
+| P6-04 | `test:soak` tạo tải no-store đồng thời, kiểm tra active/queued không vượt bulkhead và trở về 0; CI lưu container stats trước/sau. |
+| P6-05 | `test:security` bao phủ malformed JSON, auth sai/thiếu, oversized/decompression bomb, encoded input lỗi, traversal và metric redaction; renderer acceptance giữ secure include; CI kiểm tra canary không xuất hiện trong log. |
+| P6-06 | Determinism suite lưu SHA-256 từng engine/alias, giữ cache bypass và so baseline trước/sau restart backend. |
+| P6-07 | `test:repeat` chạy Gateway unit/integration ba vòng với deadline từng vòng và report JSON; P0 không có quarantine. |
+| P6-08 | Product CI dùng Node.js 24, Java 25 và Ubuntu 24.04; Extension Host giữ matrix Linux/Windows và VS Code minimum/Stable. |
+| P6-09 | External Actions được pin commit SHA; CI sinh npm/container SBOM, quét image build hiện tại bằng Trivy và fail với mọi High/Critical; runtime Kroki loại build/header packages sau assembly; Compose áp dụng non-root, read-only rootfs, dropped capabilities, no-new-privileges và CPU/RAM/PID limits. |
+
+### Baseline cục bộ gần nhất
+
+| Gate | Kết quả ngày 2026-07-23 |
+|---|---|
+| Security và renderer acceptance | Pass toàn bộ bốn engine MVP, PNG hỗ trợ, invalid source, include security và abuse input. |
+| Performance | Health p95 3.1 ms; cache-hit p95 7.4 ms; render p95 lớn nhất 0.9 giây; workspace 100 diagram 24.8 giây. |
+| Soak | 60 giây, concurrency 12, 73/73 request thành công; active tối đa 4, queue tối đa 8, kết thúc 0/0. |
+| Recovery | Mermaid down: ready 503 nhưng ba engine độc lập vẫn hoạt động; start/restart tự trở lại ready 200. |
+| Determinism | Mermaid, PlantUML, C4, Graphviz/DOT và D2 giữ nguyên SHA-256 qua restart. |
+| Supply chain | Gateway, Kroki và Mermaid image build từ source có 0 High/Critical theo Trivy, kể cả advisory chưa có bản vá; container policy pass. |
 
 ### Exit criteria
 

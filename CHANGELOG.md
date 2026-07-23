@@ -21,12 +21,17 @@ versioned entry and uses it as the GitHub release notes.
 - Complete the VS Code Extension MVP with five diagram file types, stale-safe live preview, line/column diagnostics, SVG/PNG export, optional atomic render-on-save, Gateway discovery, SecretStorage credentials, zoom controls, and strict webview CSP.
 - Add packaged VSIX installation and Extension Host E2E gates for VS Code 1.100, current Stable, Linux, and Windows, plus a real-Gateway Compose smoke.
 - Add GitHub Actions OIDC authentication with configurable issuer/audience/JWKS rotation, immutable repository/workflow/event/ref policy, public/private/fork PR support, redacted policy audit events, and explicit Action auth modes with API-key fallback.
+- Add Phase 6 quality gates for performance, 100-diagram workspace throughput, concurrency soak, security abuse, dependency recovery, deterministic output across restarts, flaky-test repetition, and container runtime policy.
+- Generate npm and container SBOMs, scan current-commit Gateway/Kroki/Mermaid images for all High/Critical vulnerabilities, and pin third-party GitHub Actions to immutable revisions.
 
 ### Changed
 
 - Reduce container CI time by fixing the false multi-architecture build condition, loading native images only once before smoke tests, persisting BuildKit layers with a stable Docker-input cache key, and bounding the build and smoke-test steps with diagnostics on failure.
 - Make Product CI build Kroki and Mermaid from the same checkout, trigger on fork/renderer changes, bound every E2E stage, and persist fork image layers.
 - Make Node SEA renderer stages reproducible with lockfile installs, optional native tooling, and host-independent lint input.
+- Harden the reference Compose topology with non-root/read-only containers, dropped capabilities, no-new-privileges, explicit CPU/memory/PID limits, and restart/recovery verification.
+- Update fixable runtime dependencies in the Kroki image and rebuild the pinned D2 renderer with patched Go modules while preserving D2 `0.7.1` behavior.
+- Remove compiler and Linux header packages after Kroki image assembly so build-only kernel advisories do not remain in the runtime.
 
 ### Fixed
 
