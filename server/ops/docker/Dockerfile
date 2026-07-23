@@ -171,7 +171,9 @@ RUN go get github.com/go-jose/go-jose/v3@v3.0.5 \
     golang.org/x/image@v0.43.0 \
     golang.org/x/net@v0.55.0 && \
     go mod tidy && \
-    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -trimpath -o /out/d2 .
+    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -trimpath \
+      -ldflags "-X oss.terrastruct.com/d2/lib/version.Version=v${D2_VERSION}" \
+      -o /out/d2 .
 
 ## yuzutech/kroki
 FROM eclipse-temurin:25-jre-noble

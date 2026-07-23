@@ -36,7 +36,7 @@ public class HelloServiceTest {
     Mockito.verify(httpServerResponseMock).putHeader(HttpHeaders.CONTENT_TYPE, "text/html");
     Mockito.verify(httpServerResponseMock).end(argThat((ArgumentMatcher<String>) argument ->
       {
-        String response = argument.toString();
+        String response = argument.toString().replace("\r\n", "\n");
         return response.startsWith("<!DOCTYPE html>\n<html");
       }
     ));

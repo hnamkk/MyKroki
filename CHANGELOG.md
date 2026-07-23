@@ -44,6 +44,8 @@ versioned entry and uses it as the GitHub release notes.
 - Make dependency recovery wait for a successful Mermaid render after backend restart instead of failing on a transient 503.
 - Make VSIX archives byte-for-byte reproducible by normalizing ZIP timestamps and file ordering through `SOURCE_DATE_EPOCH`.
 - Prevent false stale SVG reports on Windows self-hosted runners by normalizing checkout line endings during GitHub Action comparison while retaining byte-exact PNG checks.
+- Embed the pinned D2 release version during container builds so regenerated SVG metadata remains deterministic instead of reporting a development `-HEAD` version.
+- Make the Maven wrapper and hello-page test tolerate regular Windows directories and CRLF checkouts for clean local JDK 25 builds.
 
 ## [0.31.1] - 2026-07-15
 

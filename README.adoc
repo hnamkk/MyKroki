@@ -163,9 +163,13 @@ Install `task` command-line: https://taskfile.dev/installation/
 
 === Gateway Server
 
-The first step is to build the project using Maven:
+Building the Kroki fork requires JDK 25. The first step is to build the project using Maven:
 
  $ task mavenBuild
+
+On Windows, the repository wrapper can be used directly:
+
+ $ mvnw.cmd --no-transfer-progress test
 
 === Docker Images
 
