@@ -41,6 +41,7 @@ node_modules/
 *.vsix
 *.tgz
 /product/**/dist/
+/product/**/dist-test/
 /product/**/.vscode-test/
 /product/release/
 /product/github-action/e2e/generated/

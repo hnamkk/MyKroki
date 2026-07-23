@@ -1,0 +1,11 @@
+version: 1
+sources:
+  - diagrams/**/*.mmd
+output: generated
+defaults:
+  format: svg
+  theme: default
+preview:
+  debounceMs: 200
+render:
+  onSave: false

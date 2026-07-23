@@ -468,7 +468,9 @@ Command invocation
   > extension defaults
 ```
 
-Gateway URL và API key không nằm trong `.diagram.yml`. Webview nhận SVG đã sanitize dưới dạng image resource; CSP mặc định `default-src 'none'`, chỉ mở script/style bundled và image resource của extension.
+Gateway URL và API key không nằm trong `.diagram.yml`. Webview nhận SVG/PNG đã validate dưới dạng base64 data image, không chèn source hoặc raw SVG vào DOM. CSP dùng `default-src 'none'`, nonce ngẫu nhiên cho script/style điều khiển zoom và `localResourceRoots: []`. Preview giữ output thành công cuối cùng khi request mới lỗi; diagnostics vẫn phản ánh lỗi hiện tại.
+
+Export và render-on-save tính path bằng shared planner, kiểm tra cả path traversal lẫn symlink ancestor, ghi vào temporary file cùng thư mục rồi atomic rename. Render-on-save dùng `render.onSave` và format/engine override trong `.diagram.yml`, mặc định tắt; render lỗi không chạm output tốt hiện có.
 
 ### 3.5 GitHub Action
 
@@ -808,7 +810,7 @@ Ví dụ:
 
 ### 5.6 `.diagram.yml` và JSON Schema
 
-Schema máy đọc được đặt tại `product/packages/diagram-config/schema/diagram-config.schema.json`. VS Code Extension và GitHub Action cùng dùng parser, effective-settings resolver và output-path planner từ package `@diagram-as-code/diagram-config`; Gateway URL và credential không thuộc file cấu hình dự án.
+Schema máy đọc được đặt tại `product/packages/diagram-config/schema/diagram-config.schema.json`. VS Code Extension và GitHub Action cùng dùng parser, effective-settings resolver, deterministic request planner và output-path planner từ package `@diagram-as-code/diagram-config`; Gateway URL và credential không thuộc file cấu hình dự án.
 
 Ví dụ cấu hình:
 
