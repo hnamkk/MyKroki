@@ -1,9 +1,21 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import { parseDiagramConfig } from "@diagram-as-code/diagram-config";
 
-import { buildVerificationPlan, deterministicRequest, type FileChange } from "../src/core.ts";
+import {
+  buildVerificationPlan,
+  assertUniqueOutputPaths,
+  deterministicRequest,
+  findOrphanedOutputs,
+  parseActionInputs,
+  parseNameStatus,
+  resolveWithinRoot,
+  type FileChange,
+} from "../src/core.ts";
 
 const config = parseDiagramConfig(`
 version: 1
@@ -69,4 +81,75 @@ test("builds deterministic OpenAPI render requests", () => {
     source: "@startuml\n@enduml",
     options: { theme: "default", "no-metadata": true },
   });
+});
+
+test("validates all public Action inputs strictly", () => {
+  assert.deepEqual(parseActionInputs({ "gateway-url": "https://diagrams.example.test/" }), {
+    gatewayUrl: "https://diagrams.example.test",
+    apiKey: undefined,
+    configPath: ".diagram.yml",
+    mode: "check",
+    changedOnly: true,
+    artifactName: "diagram-previews",
+    failOnStale: true,
+  });
+  assert.throws(() => parseActionInputs({ "gateway-url": "file:///tmp/gateway" }), /HTTP\(S\)/);
+  assert.throws(() => parseActionInputs({ "gateway-url": "https://user:secret@example.test" }), /embedded credentials/);
+  assert.throws(() => parseActionInputs({ "gateway-url": "https://example.test", mode: "commit" }), /check.*generate/);
+  assert.throws(() => parseActionInputs({ "gateway-url": "https://example.test", "config-path": "../secret" }), /repository-relative/);
+  assert.throws(() => parseActionInputs({ "gateway-url": "https://example.test", "changed-only": "yes" }), /true.*false/);
+});
+
+test("parses rename and deletion records from git name-status", () => {
+  assert.deepEqual(parseNameStatus("R100\told/a.mmd\tnew/a.mmd\nD\told/b.puml\n"), [
+    { status: "R", oldPath: "old/a.mmd", path: "new/a.mmd" },
+    { status: "D", path: "old/b.puml" },
+  ]);
+});
+
+test("finds orphaned SVG and PNG files during a full scan", () => {
+  assert.deepEqual(
+    findOrphanedOutputs(
+      ["docs/diagrams/a.mmd"],
+      ["docs/generated/a.svg", "docs/generated/removed.svg", "docs/generated/old.png"],
+      config,
+    ),
+    [
+      { sourcePath: "", outputPath: "docs/generated/old.png", operation: "remove" },
+      { sourcePath: "", outputPath: "docs/generated/removed.svg", operation: "remove" },
+    ],
+  );
+});
+
+test("rejects two diagram sources that map to the same generated output", () => {
+  const collisionConfig = parseDiagramConfig(`
+version: 1
+sources: [docs/diagrams/**/*]
+output: docs/generated
+`);
+  assert.throws(
+    () => assertUniqueOutputPaths(["docs/diagrams/a.mmd", "docs/diagrams/a.puml"], collisionConfig),
+    /map to the same output/,
+  );
+});
+
+test("a rename that keeps the output path does not plan its removal", () => {
+  assert.deepEqual(buildVerificationPlan([
+    { status: "R", oldPath: "docs/diagrams/a.puml", path: "docs/diagrams/a.mmd" },
+  ], ["docs/diagrams/a.mmd"], config, false), [
+    { sourcePath: "docs/diagrams/a.mmd", outputPath: "docs/generated/a.svg", operation: "verify" },
+  ]);
+});
+
+test("refuses lexical and symlink workspace escapes", (context) => {
+  const root = mkdtempSync(join(tmpdir(), "diagram-action-root-"));
+  const outside = mkdtempSync(join(tmpdir(), "diagram-action-outside-"));
+  context.after(() => {
+    rmSync(root, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  });
+  assert.throws(() => resolveWithinRoot(root, "../secret"), /repository-relative/);
+  mkdirSync(join(root, "docs"));
+  symlinkSync(outside, join(root, "docs", "linked"), "junction");
+  assert.throws(() => resolveWithinRoot(root, "docs/linked/output.svg"), /outside/);
 });

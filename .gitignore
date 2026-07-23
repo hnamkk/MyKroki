@@ -43,6 +43,7 @@ node_modules/
 /product/**/dist/
 /product/**/.vscode-test/
 /product/release/
+/product/github-action/e2e/generated/
 
 # GitHub Actions execute the committed bundle directly.
 !/product/github-action/dist/

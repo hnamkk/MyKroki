@@ -64,8 +64,12 @@
 | Determinism | `product/scripts/determinism-test.mjs` trong Gateway container | `TC-REN-012`, C4 và Graphviz/DOT equivalence, cache bypass. |
 | Failure isolation | Dừng Mermaid rồi chạy `npm run test:isolation --prefix product` | `TC-REN-011`, `NFR-AVL-002`; PlantUML, Graphviz và D2 vẫn render. |
 | Kroki resource cleanup | Java 25 `CommanderTest,DelegatorTest` | Process tree cleanup, companion deadline và stack-trace suppression. |
+| GitHub Action unit/integration | `npm test --workspace=diagram-as-code-action --prefix product` | Input/path guard, planner rename/delete/full scan, output collision, API key, HTTP taxonomy, annotation, check read-only, generate rollback, artifact manifest và committed CommonJS bundle khởi động trên Node.js 24. |
+| GitHub Action runner E2E | Job Compose trong `.github/workflows/product-ci.yml` | Bundle thật gọi Gateway thật; current/stale/syntax/auth, artifact upload, PR generate guard và trusted generate. |
 
 Các cổng trên chạy trong job Compose của Product CI trên image Kroki/Mermaid được build từ cùng checkout. Job và từng lệnh có deadline; HTTP E2E có request timeout riêng và runner tôn trọng `Retry-After` khi acceptance vượt burst rate limit.
+
+OIDC (`TC-GHA-007`) và auto-commit (`TC-GHA-010..011`) vẫn là phạm vi phase sau/Could theo SRS; chúng không chặn exit criteria Phase 3 dùng API key và generate không commit.
 
 ### 2.4 Kỹ thuật và priority
 

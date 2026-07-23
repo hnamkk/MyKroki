@@ -4,12 +4,12 @@ Lớp sản phẩm này bổ sung workflow hoàn chỉnh quanh fork Kroki mà kh
 
 - `gateway`: Fastify API có scoped API-key principals, rate limit, bounded render queue, output validation/SVG sanitization, weighted TTL LRU/single-flight cache và Prometheus metrics.
 - `vscode-extension`: live preview và export SVG thủ công, ổn định.
-- `github-action`: kiểm tra SVG đã commit có khớp source trên pull request.
+- `github-action`: check/generate SVG hoặc PNG, annotation lỗi, artifact preview và bảo vệ PR/fork.
 - `deploy`: Compose self-hosted, chỉ expose Gateway.
 
 ## Luồng sử dụng
 
-Developer sửa file trong `docs/diagrams`, mở preview và dùng `Diagram: Export SVG` khi muốn cập nhật artifact. Họ commit cả source text và SVG. Pull request hiển thị text diff lẫn GitHub image diff; Action gọi cùng Gateway và fail nếu SVG cũ.
+Developer sửa file trong `docs/diagrams`, mở preview và dùng `Diagram: Export SVG` khi muốn cập nhật artifact. Họ commit cả source text và SVG/PNG. Pull request hiển thị text diff lẫn GitHub image diff; Action gọi cùng Gateway, upload preview và fail nếu output cũ. Trên `push` hoặc `workflow_dispatch`, `mode: generate` có thể cập nhật workspace nhưng không tự commit.
 
 ## Chạy local
 
@@ -19,6 +19,7 @@ Developer sửa file trong `docs/diagrams`, mở preview và dùng `Diagram: Exp
 4. Chạy `npm run test:renderers` để kiểm tra SVG/PNG, alias, error contract và secure includes trên stack đang chạy.
 5. Copy `product/.diagram.example.yml` thành `.diagram.yml` ở repo sử dụng.
 6. Build/cài VSIX từ `product/vscode-extension/dist/diagram-as-code-vscode.vsix`.
+7. Thiết lập workflow theo [GitHub Action README](github-action/README.md); private Gateway dùng API key từ GitHub Secret.
 
 `npm run test:isolation` dành cho fault injection: dừng riêng Mermaid companion trước khi chạy và khởi động lại sau khi kiểm tra.
 
@@ -26,4 +27,4 @@ Các quy trình TLS, key rotation, update và rollback nằm trong [Infrastructu
 
 ## Phạm vi MVP
 
-MVP nhận `.mmd`, `.puml`, `.plantuml`, `.dot`, `.d2`; SVG là đầu ra mặc định và PNG dùng cho engine công bố hỗ trợ. Không tự quét source code ứng dụng để suy ra kiến trúc, không tự export khi save, không tự commit từ CI, và chưa có playground, database, Redis hay SaaS billing.
+MVP nhận `.mmd`, `.puml`, `.plantuml`, `.dot`, `.d2`; SVG là đầu ra mặc định và PNG dùng cho engine công bố hỗ trợ. Không tự quét source code ứng dụng để suy ra kiến trúc, không tự commit từ CI, và chưa có OIDC, playground, database, Redis hay SaaS billing.

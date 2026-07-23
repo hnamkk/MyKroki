@@ -1,5 +1,5 @@
-name: Diagram as Code Check
-description: Verify that committed SVG diagrams match their text sources.
+name: Diagram as Code
+description: Check or generate diagram artifacts through a Diagram as Code Gateway.
 author: Diagram as Code
 inputs:
   gateway-url:
@@ -7,20 +7,34 @@ inputs:
     required: true
   api-key:
     description: Gateway API key. Pass this from GitHub Actions secrets.
-    required: true
+    required: false
   config-path:
     description: Repository-relative project configuration file.
     required: false
     default: .diagram.yml
   changed-only:
-    description: Check only changed diagrams unless rendering configuration changed.
+    description: On pull requests, check only affected diagrams unless rendering configuration changed.
+    required: false
+    default: "true"
+  mode:
+    description: Use check for read-only validation or generate to update the workspace on a trusted event.
+    required: false
+    default: check
+  artifact-name:
+    description: Workflow artifact containing rendered previews and a safe manifest.
+    required: false
+    default: diagram-previews
+  fail-on-stale:
+    description: Fail check mode when generated outputs are missing, stale, or orphaned.
     required: false
     default: "true"
 outputs:
   checked-count:
     description: Number of source diagrams checked.
   stale-count:
-    description: Number of stale or orphaned SVG files.
+    description: Number of missing, stale, or orphaned outputs.
+  generated-count:
+    description: Number of outputs written or removed in generate mode.
 runs:
   using: node24
   main: dist/index.cjs

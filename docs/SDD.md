@@ -476,15 +476,15 @@ Gateway URL và API key không nằm trong `.diagram.yml`. Webview nhận SVG đ
 |---|---|
 | `ConfigLoader` | Đọc và validate `.diagram.yml` bằng shared schema/package. |
 | `ChangeDetector` | Xác định source thay đổi trên PR; full scan trên main/manual. |
-| `AuthProvider` | API key hoặc GitHub OIDC exchange. |
+| `AuthProvider` | Phase 3 dùng API key được mask hoặc local no-auth; GitHub OIDC exchange là phase kế tiếp. |
 | `GatewayClient` | Gọi cùng render API với VS Code. |
 | `OutputPlanner` | Tính deterministic output path. |
 | `CheckRunner` | Render, so sánh byte/hash và phát hiện stale output. |
 | `AnnotationReporter` | Ghi lỗi file/line và job summary. |
 | `ArtifactPublisher` | Upload output mới khi check lỗi hoặc theo cấu hình. |
-| `GenerateRunner` | Ghi output; không tự commit trừ khi `commit: true`. |
+| `GenerateRunner` | Render all-or-nothing, ghi output atomically trên trusted event và không tự commit. |
 
-Action được viết bằng TypeScript và bundle thành một JavaScript artifact để người dùng không phải cài dependency. `check` là mode mặc định và chỉ cần `contents: read`; OIDC thêm `id-token: write`. Logic commit là adapter tùy chọn, không nằm trong render core.
+Action được viết bằng TypeScript và bundle thành `dist/index.cjs` để người dùng không phải cài dependency. `check` là mode mặc định, chỉ cần `contents: read`, staging artifact ngoài workspace và không có write path. `generate` bị từ chối trên mọi `pull_request` event; chỉ ghi sau khi tất cả render thành công và rollback khi transaction file lỗi. Phase 3 hỗ trợ API key từ GitHub Secret hoặc Gateway local no-auth. OIDC (`id-token: write`) và adapter commit là mở rộng sau MVP, không nằm trong render core hiện tại.
 
 ### 3.6 Shared configuration package
 
@@ -559,7 +559,7 @@ sequenceDiagram
     Ext-->>Dev: Gạch lỗi và hiển thị Problems entry
 ```
 
-### 4.3 GitHub Action kiểm tra pull request bằng OIDC
+### 4.3 GitHub Action kiểm tra pull request bằng OIDC (thiết kế phase kế tiếp)
 
 ```mermaid
 sequenceDiagram
