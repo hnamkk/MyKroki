@@ -1,5 +1,10 @@
 import path from "node:path";
 
+import {
+  detectDiagramEngine,
+  type OutputFormat,
+  type RenderRequest,
+} from "@diagram-as-code/contracts";
 import { minimatch } from "minimatch";
 import { parse as parseYaml } from "yaml";
 import { z } from "zod";
@@ -133,4 +138,34 @@ export function outputPathForSource(
     throw new Error("Generated output escapes the configured output directory");
   }
   return output;
+}
+
+export function deterministicRenderRequest(
+  sourcePath: string,
+  source: string,
+  config: DiagramConfig,
+  formatOverride?: OutputFormat,
+): RenderRequest {
+  const normalizedPath = normalize(sourcePath);
+  const engine = detectDiagramEngine(normalizedPath);
+  if (!engine) throw new Error(`Unsupported diagram source: ${normalizedPath}`);
+
+  const settings = effectiveRenderSettings(normalizedPath, config);
+  const options: NonNullable<RenderRequest["options"]> = {
+    theme: settings.theme,
+    ...settings.options,
+  };
+  if (engine === "mermaid") {
+    options["deterministic-ids"] = true;
+    options["deterministic-id-seed"] = normalizedPath;
+  } else if (engine === "plantuml") {
+    options["no-metadata"] = true;
+  }
+
+  return {
+    engine,
+    format: formatOverride ?? settings.format,
+    source,
+    options,
+  };
 }

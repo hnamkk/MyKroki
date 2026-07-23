@@ -20,23 +20,24 @@ test("exposes prioritized editor and preview title buttons", () => {
   const editorItems = manifest.contributes.menus["editor/title"] ?? [];
   assert.deepEqual(menuCommands("editor/title"), [
     "diagramAsCode.preview",
-    "diagramAsCode.exportSvg",
+    "diagramAsCode.export",
   ]);
   assert.deepEqual(editorItems.map((item) => item.group), ["navigation@1", "navigation@2"]);
   assert.deepEqual(menuCommands("webview/title"), [
     "diagramAsCode.refreshPreview",
-    "diagramAsCode.exportPreviewSvg",
+    "diagramAsCode.exportPreview",
   ]);
 
   const commands = new Map(manifest.contributes.commands.map((item) => [item.command, item]));
   assert.equal(commands.get("diagramAsCode.refreshPreview")?.icon, "$(refresh)");
-  assert.equal(commands.get("diagramAsCode.exportPreviewSvg")?.icon, "$(export)");
+  assert.equal(commands.get("diagramAsCode.exportPreview")?.icon, "$(export)");
 });
 
 test("exposes diagram commands from editor and Explorer context menus", () => {
   const expected = [
     "diagramAsCode.preview",
-    "diagramAsCode.exportSvg",
+    "diagramAsCode.export",
+    "diagramAsCode.checkConnection",
     "diagramAsCode.setApiKey",
   ];
   assert.deepEqual(menuCommands("editor/context"), expected);

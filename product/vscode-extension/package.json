@@ -1,7 +1,7 @@
 {
   "name": "diagram-as-code-vscode",
   "displayName": "Diagram as Code",
-  "description": "Live Kroki previews and deterministic SVG export for diagram source files.",
+  "description": "Live Gateway previews, diagnostics, and deterministic SVG/PNG export for diagram source files.",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -22,6 +22,9 @@
     "prebuild": "npm --workspace=@diagram-as-code/contracts run build && npm --workspace=@diagram-as-code/diagram-config run build",
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs",
     "test": "tsx --test test/*.test.ts",
+    "test:e2e:build": "esbuild test/e2e/suite.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist-test/suite.cjs",
+    "test:e2e": "npm run package && npm run test:e2e:build && node scripts/run-e2e.mjs",
+    "test:gateway-smoke": "tsx scripts/gateway-smoke.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "package": "npm run build && vsce package --no-dependencies --out dist/diagram-as-code-vscode.vsix"
   },
@@ -31,6 +34,7 @@
   },
   "devDependencies": {
     "@types/vscode": "^1.100.0",
+    "@vscode/test-electron": "^2.5.2",
     "@vscode/vsce": "^3.6.0",
     "esbuild": "^0.25.0"
   },
@@ -41,37 +45,45 @@
     "onLanguage:diagram-dot",
     "onLanguage:diagram-d2",
     "onCommand:diagramAsCode.preview",
+    "onCommand:diagramAsCode.export",
     "onCommand:diagramAsCode.exportSvg",
+    "onCommand:diagramAsCode.exportPng",
     "onCommand:diagramAsCode.refreshPreview",
-    "onCommand:diagramAsCode.exportPreviewSvg",
+    "onCommand:diagramAsCode.exportPreview",
+    "onCommand:diagramAsCode.checkConnection",
     "onCommand:diagramAsCode.setApiKey"
   ],
   "contributes": {
     "commands": [
       { "command": "diagramAsCode.preview", "title": "Diagram: Open Preview", "icon": "$(eye)" },
+      { "command": "diagramAsCode.export", "title": "Diagram: Export...", "icon": "$(export)" },
       { "command": "diagramAsCode.exportSvg", "title": "Diagram: Export SVG", "icon": "$(export)" },
+      { "command": "diagramAsCode.exportPng", "title": "Diagram: Export PNG", "icon": "$(export)" },
       { "command": "diagramAsCode.refreshPreview", "title": "Diagram: Refresh Preview", "icon": "$(refresh)" },
-      { "command": "diagramAsCode.exportPreviewSvg", "title": "Diagram: Export Preview as SVG", "icon": "$(export)" },
+      { "command": "diagramAsCode.exportPreview", "title": "Diagram: Export Preview...", "icon": "$(export)" },
+      { "command": "diagramAsCode.checkConnection", "title": "Diagram: Check Gateway Connection", "icon": "$(pulse)" },
       { "command": "diagramAsCode.setApiKey", "title": "Diagram: Set Gateway API Key", "icon": "$(key)" }
     ],
     "menus": {
       "editor/title": [
         { "command": "diagramAsCode.preview", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "navigation@1" },
-        { "command": "diagramAsCode.exportSvg", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "navigation@2" }
+        { "command": "diagramAsCode.export", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "navigation@2" }
       ],
       "webview/title": [
         { "command": "diagramAsCode.refreshPreview", "when": "webviewType == diagramAsCode.preview", "group": "navigation@1" },
-        { "command": "diagramAsCode.exportPreviewSvg", "when": "webviewType == diagramAsCode.preview", "group": "navigation@2" }
+        { "command": "diagramAsCode.exportPreview", "when": "webviewType == diagramAsCode.preview", "group": "navigation@2" }
       ],
       "editor/context": [
         { "command": "diagramAsCode.preview", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "diagram@1" },
-        { "command": "diagramAsCode.exportSvg", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "diagram@2" },
-        { "command": "diagramAsCode.setApiKey", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "diagram@3" }
+        { "command": "diagramAsCode.export", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "diagram@2" },
+        { "command": "diagramAsCode.checkConnection", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "diagram@3" },
+        { "command": "diagramAsCode.setApiKey", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "diagram@4" }
       ],
       "explorer/context": [
         { "command": "diagramAsCode.preview", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "diagram@1" },
-        { "command": "diagramAsCode.exportSvg", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "diagram@2" },
-        { "command": "diagramAsCode.setApiKey", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "diagram@3" }
+        { "command": "diagramAsCode.export", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "diagram@2" },
+        { "command": "diagramAsCode.checkConnection", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "diagram@3" },
+        { "command": "diagramAsCode.setApiKey", "when": "resourceExtname == .mmd || resourceExtname == .puml || resourceExtname == .plantuml || resourceExtname == .dot || resourceExtname == .d2", "group": "diagram@4" }
       ]
     },
     "languages": [
@@ -87,11 +99,13 @@
         "diagramAsCode.configFile": {
           "type": "string",
           "default": ".diagram.yml",
+          "scope": "resource",
           "description": "Workspace-relative Diagram as Code configuration file."
         },
         "diagramAsCode.gatewayUrl": {
           "type": "string",
           "default": "http://localhost:9000",
+          "scope": "resource",
           "description": "Base URL of the Diagram Gateway."
         }
       }

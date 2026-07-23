@@ -67,6 +67,41 @@ jobs:
           name: diagram-as-code-vscode
           path: product/vscode-extension/dist/*.vsix
 
+  vscode-extension-host:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            vscode-version: "1.100.0"
+          - os: ubuntu-24.04
+            vscode-version: stable
+          - os: windows-2025
+            vscode-version: stable
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: product/package-lock.json
+      - run: npm ci
+        working-directory: product
+      - name: Run Extension Host E2E and install packaged VSIX (Linux)
+        if: runner.os == 'Linux'
+        run: xvfb-run -a npm --workspace=diagram-as-code-vscode run test:e2e
+        working-directory: product
+        env:
+          VSCODE_TEST_VERSION: ${{ matrix.vscode-version }}
+      - name: Run Extension Host E2E and install packaged VSIX (Windows)
+        if: runner.os == 'Windows'
+        run: npm --workspace=diagram-as-code-vscode run test:e2e
+        working-directory: product
+        env:
+          VSCODE_TEST_VERSION: ${{ matrix.vscode-version }}
+
   compose:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
@@ -83,6 +118,8 @@ jobs:
           java-version: 25
           distribution: temurin
           cache: maven
+      - run: npm ci
+        working-directory: product
       - name: Package Kroki server for the container image
         run: ./mvnw --no-transfer-progress -DskipTests package
       - uses: docker/setup-buildx-action@v4
@@ -133,6 +170,12 @@ jobs:
           DIAGRAM_GATEWAY_URL: http://localhost:19000
           DIAGRAM_API_KEY: ci-secret
         run: timeout --signal=TERM --kill-after=1m 8m node scripts/smoke-test.mjs
+        working-directory: product
+      - name: Smoke VS Code client against the real Gateway
+        env:
+          DIAGRAM_GATEWAY_URL: http://localhost:19000
+          DIAGRAM_API_KEY: ci-secret
+        run: timeout --signal=TERM --kill-after=1m 3m npm run test:vscode-gateway
         working-directory: product
       - name: Prepare GitHub Action E2E fixture
         env:

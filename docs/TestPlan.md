@@ -51,7 +51,7 @@
 | Unit | Mọi pull request | Không phụ thuộc network/process ngoài; lỗi làm fail PR. |
 | Contract/integration | PR thay đổi module liên quan | Fixture và renderer version được pin; lỗi P0 làm fail PR. |
 | Docker E2E | PR vào main và nightly | Lưu log/artifact khi lỗi. |
-| VS Code E2E | PR extension và nightly đa nền tảng | Extension Host headless; smoke thủ công trước release. |
+| VS Code E2E | PR extension: Linux trên version tối thiểu/Stable và Windows Stable | Extension Host headless, cài VSIX thật; Compose chạy thêm smoke client với Gateway thật. |
 | GitHub E2E | Test repo trước release | Tách public/private; không dùng production credential. |
 | Performance/security | Nightly và release candidate | Môi trường cố định; lưu p50/p95/p99 và bằng chứng redaction. |
 
@@ -213,6 +213,16 @@ Rate-limit integration test được phép dùng profile nhỏ hơn, ví dụ 6/
 | TC-VSC-008 | Shared config | Có default/override | Render fixture dùng chung với Action. | Format/theme/output path giống Action. | P0 |
 | TC-VSC-009 | Connection | Local/hosted/bad URL | Chạy check connection. | Hiện health/engines hoặc lỗi rõ; giữ preview cũ khi mất kết nối. | P1 |
 | TC-VSC-010 | Secret/Webview | Hosted cần key | Lưu key, restart host, preview; inspect log/settings. | Key chỉ ở SecretStorage; CSP chặn resource/script không phép; không rò key. | P0 |
+
+#### Bằng chứng tự động Phase 4
+
+| Nhóm | Vị trí/lệnh | Bao phủ |
+|---|---|---|
+| Unit/contract | `npm --workspace=diagram-as-code-vscode test` | Gateway client SVG/PNG/problem, cancellation/cache, path guard, command/language contribution, CSP và secret-setting boundary. |
+| Shared planner | `product/packages/diagram-config/test/config.test.ts` và Action core tests | Cùng parser, options deterministic, format và output path cho Extension/Action. |
+| Extension Host | `npm --workspace=diagram-as-code-vscode run test:e2e` | Cài VSIX, activation, preview, SVG/PNG export, diagnostics/clear, default save-off, render-on-save và không ghi đè output tốt khi lỗi. |
+| Version/OS matrix | `Product CI / vscode-extension-host` | VS Code `1.100.0` và Stable trên Linux; Stable trên Windows. |
+| Gateway thật | `npm run test:vscode-gateway` trong Compose job | Health, engine discovery và Mermaid SVG/PNG qua Gateway + Kroki thật. |
 
 ### 4.6 GitHub Action
 

@@ -33,6 +33,8 @@ a GitHub Action, and a Docker Compose topology in front of the Kroki rendering b
 The Action supports read-only pull-request checks, preview artifacts, renderer annotations,
 and trusted-event generation without committing automatically; see
 link:product/github-action/README.md[the setup and fork-security guide].
+The link:product/vscode-extension/README.md[VS Code extension] provides live preview,
+Problems diagnostics, SVG/PNG export, optional render-on-save, and Gateway connection checks.
 
 Install and verify the product workspace independently:
 

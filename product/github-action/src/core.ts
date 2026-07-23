@@ -1,11 +1,7 @@
-import {
-  detectDiagramEngine,
-  type RenderRequest,
-} from "@diagram-as-code/contracts";
 import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 import {
-  effectiveRenderSettings,
+  deterministicRenderRequest,
   outputPathForSource,
   type DiagramConfig,
 } from "@diagram-as-code/diagram-config";
@@ -165,28 +161,8 @@ export function deterministicRequest(
   sourcePath: string,
   source: string,
   config: DiagramConfig,
-): RenderRequest {
-  const engine = detectDiagramEngine(sourcePath);
-  if (!engine) throw new Error(`Unsupported diagram source: ${sourcePath}`);
-
-  const settings = effectiveRenderSettings(sourcePath, config);
-  const options: NonNullable<RenderRequest["options"]> = {
-    theme: settings.theme,
-    ...settings.options,
-  };
-  if (engine === "mermaid") {
-    options["deterministic-ids"] = true;
-    options["deterministic-id-seed"] = normalize(sourcePath);
-  } else if (engine === "plantuml") {
-    options["no-metadata"] = true;
-  }
-
-  return {
-    engine,
-    format: settings.format,
-    source,
-    options,
-  };
+): ReturnType<typeof deterministicRenderRequest> {
+  return deterministicRenderRequest(sourcePath, source, config);
 }
 
 export function parseNameStatus(output: string): FileChange[] {

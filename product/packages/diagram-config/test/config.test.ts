@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { effectiveRenderSettings, outputPathForSource, parseDiagramConfig } from "../src/index.ts";
+import {
+  deterministicRenderRequest,
+  effectiveRenderSettings,
+  outputPathForSource,
+  parseDiagramConfig,
+} from "../src/index.ts";
 
 const minimal = `
 version: 1
@@ -47,6 +52,27 @@ engines:
     options: { layout: "neato" },
   });
   assert.equal(outputPathForSource("docs/diagrams/a.dot", config), "docs/generated/a.png");
+});
+
+test("builds the same deterministic request for all product clients", () => {
+  const config = parseDiagramConfig(minimal);
+  assert.deepEqual(
+    deterministicRenderRequest("docs/diagrams/a.mmd", "flowchart LR\nA-->B", config),
+    {
+      engine: "mermaid",
+      format: "svg",
+      source: "flowchart LR\nA-->B",
+      options: {
+        theme: "default",
+        "deterministic-ids": true,
+        "deterministic-id-seed": "docs/diagrams/a.mmd",
+      },
+    },
+  );
+  assert.equal(
+    deterministicRenderRequest("docs/diagrams/a.mmd", "A-->B", config, "png").format,
+    "png",
+  );
 });
 
 test("rejects endpoint fields, path traversal, and unsupported versions", () => {

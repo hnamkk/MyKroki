@@ -11,5 +11,5 @@ test("provides visible Preview and Export status bar actions", () => {
   assert.match(extensionSource, /\$\(eye\) Preview/);
   assert.match(extensionSource, /\$\(export\) Export/);
   assert.match(extensionSource, /previewItem\.command = "diagramAsCode\.preview"/);
-  assert.match(extensionSource, /exportItem\.command = "diagramAsCode\.exportSvg"/);
+  assert.match(extensionSource, /exportItem\.command = "diagramAsCode\.export"/);
 });

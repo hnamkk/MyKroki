@@ -18,6 +18,8 @@ versioned entry and uses it as the GitHub release notes.
 - Harden the Gateway production boundary with hashed API-key records and scopes, partitioned weighted TTL cache with failure degradation, bounded render concurrency, response-size limits, SVG sanitization, PNG/content-type validation, structured redacted events, and aggregate Prometheus metrics.
 - Publish real per-engine renderer versions and isolated availability with deterministic capability caching, add SVG/PNG/C4/DOT acceptance and determinism gates, neutralize unsafe PlantUML includes, normalize renderer diagnostics without internal stack traces, and reap CLI process trees on timeout.
 - Complete the GitHub Action MVP with strict inputs and workspace path guards, read-only stale/orphan checks, renderer annotations, safe preview artifacts, API-key masking, Gateway failure taxonomy, changed-file planning, and transactional generate mode guarded from pull requests.
+- Complete the VS Code Extension MVP with five diagram file types, stale-safe live preview, line/column diagnostics, SVG/PNG export, optional atomic render-on-save, Gateway discovery, SecretStorage credentials, zoom controls, and strict webview CSP.
+- Add packaged VSIX installation and Extension Host E2E gates for VS Code 1.100, current Stable, Linux, and Windows, plus a real-Gateway Compose smoke.
 
 ### Changed
 
@@ -28,6 +30,7 @@ versioned entry and uses it as the GitHub release notes.
 ### Fixed
 
 - Make the bundled GitHub Action start correctly on the Node.js 24 runner by preserving `import.meta.url` semantics in its CommonJS bundle.
+- Keep VS Code preview refreshes from superseding render-on-save writes, and make the Windows Extension Host E2E assertions independent of LF/CRLF line endings.
 
 ## [0.31.1] - 2026-07-15
 

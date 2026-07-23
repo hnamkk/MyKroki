@@ -17,6 +17,7 @@
     "smoke": "node scripts/smoke-test.mjs",
     "test:renderers": "node scripts/renderer-acceptance-test.mjs",
     "test:isolation": "node scripts/engine-isolation-test.mjs",
+    "test:vscode-gateway": "npm --workspace=diagram-as-code-vscode run test:gateway-smoke",
     "contract:check": "node scripts/verify-openapi.mjs",
     "key:generate": "node scripts/generate-api-key.mjs",
     "release:bundle": "node scripts/prepare-release.mjs",
