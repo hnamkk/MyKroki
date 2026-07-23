@@ -2,9 +2,12 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { deflateRawSync } from "node:zlib";
 
+import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from "jose";
+
 import { createGateway } from "../dist/app.js";
 import { RENDER_SCOPE, apiKeyVerifier } from "../dist/auth.js";
 import type { GatewayConfig } from "../dist/config.js";
+import { GitHubOidcAuthenticator } from "../dist/github-oidc.js";
 import { RendererFailure, RendererTimeout, RendererUnavailable, type RendererClient } from "../dist/renderer.js";
 
 const config: GatewayConfig = {
@@ -16,6 +19,7 @@ const config: GatewayConfig = {
     cachePartition: "test",
     status: "active",
   }],
+  githubOidc: undefined,
   deploymentProfile: "local",
   port: 9000,
   host: "0.0.0.0",
@@ -367,4 +371,99 @@ test("emits allowlisted events and aggregate metrics without source or credentia
   const disabled = createGateway({ config: { ...config, metricsEnabled: false }, renderer: renderer() });
   assert.equal((await disabled.inject({ method: "GET", url: "/metrics" })).statusCode, 404);
   await disabled.close();
+});
+
+test("authorizes GitHub OIDC and audits repository policy without logging the JWT", async () => {
+  const { privateKey, publicKey } = await generateKeyPair("RS256");
+  const jwk = await exportJWK(publicKey);
+  const oidcConfig = {
+    issuer: "https://token.actions.githubusercontent.com",
+    audience: "diagram-gateway",
+    jwksUrl: "https://unused.example.test/jwks",
+    clockToleranceSeconds: 30,
+    jwksCacheMaxAgeMs: 600_000,
+    jwksCooldownMs: 0,
+    jwksTimeoutMs: 1_000,
+    repositoryPolicies: [{
+      repositoryId: "123456",
+      status: "active" as const,
+      scopes: [RENDER_SCOPE],
+      cachePartition: "github:123456",
+      workflowRefs: ["octo/diagrams/.github/workflows/diagram-check.yml@refs/*"],
+      events: {
+        pull_request: { refs: ["refs/pull/*"], baseRefs: ["main"] },
+      },
+    }],
+  };
+  const oidcAuthenticator = new GitHubOidcAuthenticator(
+    oidcConfig,
+    createLocalJWKSet({ keys: [{ ...jwk, kid: "test", alg: "RS256", use: "sig" }] }),
+  );
+  const makeToken = (workflowRef: string) => new SignJWT({
+    repository_id: "123456",
+    repository: "octo/diagrams",
+    repository_visibility: "private",
+    workflow_ref: workflowRef,
+    event_name: "pull_request",
+    ref: "refs/pull/42/merge",
+    base_ref: "main",
+    head_ref: "feature/diagram",
+  })
+    .setProtectedHeader({ alg: "RS256", kid: "test" })
+    .setIssuer(oidcConfig.issuer)
+    .setAudience(oidcConfig.audience)
+    .setSubject("repo:octo/diagrams:pull_request")
+    .setIssuedAt()
+    .setExpirationTime("5m")
+    .sign(privateKey);
+  const acceptedToken = await makeToken("octo/diagrams/.github/workflows/diagram-check.yml@refs/heads/main");
+  const deniedToken = await makeToken("octo/diagrams/.github/workflows/untrusted.yml@refs/heads/main");
+  const events: Record<string, unknown>[] = [];
+  const app = createGateway({
+    config: { ...config, apiKeyRecords: [], githubOidc: oidcConfig },
+    renderer: renderer(),
+    oidcAuthenticator,
+    eventSink: (event) => events.push(event),
+  });
+
+  const accepted = await app.inject({
+    method: "POST",
+    url: "/api/v1/render",
+    headers: { authorization: `Bearer ${acceptedToken}` },
+    payload: { engine: "mermaid", format: "svg", source: "flowchart LR; A-->B" },
+  });
+  const denied = await app.inject({
+    method: "POST",
+    url: "/api/v1/render",
+    headers: { authorization: `Bearer ${deniedToken}` },
+    payload: { engine: "mermaid", format: "svg", source: "flowchart LR; B-->C" },
+  });
+
+  assert.equal(accepted.statusCode, 200);
+  assert.equal(denied.statusCode, 403);
+  assert.equal(denied.json().code, "OIDC_POLICY_DENIED");
+  assert.deepEqual(events.map((event) => ({
+    principalSubject: event.principalSubject,
+    repositoryId: event.repositoryId,
+    workflowRef: event.workflowRef,
+    policyDecision: event.policyDecision,
+    statusCode: event.statusCode,
+  })), [
+    {
+      principalSubject: "github-repository:123456",
+      repositoryId: "123456",
+      workflowRef: "octo/diagrams/.github/workflows/diagram-check.yml@refs/heads/main",
+      policyDecision: "allowed",
+      statusCode: 200,
+    },
+    {
+      principalSubject: "github-repository:123456",
+      repositoryId: "123456",
+      workflowRef: "octo/diagrams/.github/workflows/untrusted.yml@refs/heads/main",
+      policyDecision: "denied",
+      statusCode: 403,
+    },
+  ]);
+  assert.doesNotMatch(JSON.stringify(events), new RegExp(acceptedToken.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  await app.close();
 });

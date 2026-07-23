@@ -8,6 +8,13 @@ inputs:
   api-key:
     description: Gateway API key. Pass this from GitHub Actions secrets.
     required: false
+  auth-mode:
+    description: Authentication strategy. auto prefers OIDC when oidc-audience is set, then falls back to api-key.
+    required: false
+    default: auto
+  oidc-audience:
+    description: Custom audience requested from GitHub OIDC and expected by the Gateway.
+    required: false
   config-path:
     description: Repository-relative project configuration file.
     required: false

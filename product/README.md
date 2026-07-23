@@ -20,7 +20,7 @@ Developer sửa file trong `docs/diagrams`, mở preview và dùng `Diagram: Exp
 5. Copy `product/.diagram.example.yml` thành `.diagram.yml` ở repo sử dụng.
 6. Build/cài VSIX từ `product/vscode-extension/dist/diagram-as-code-vscode.vsix`.
 7. Cấu hình `diagramAsCode.gatewayUrl`, lưu key bằng `Diagram: Set Gateway API Key`, rồi chạy `Diagram: Check Gateway Connection`.
-8. Thiết lập workflow theo [GitHub Action README](github-action/README.md); private Gateway dùng API key từ GitHub Secret.
+8. Thiết lập workflow theo [GitHub Action README](github-action/README.md); hosted Gateway ưu tiên GitHub OIDC, API key là fallback.
 
 `npm run test:isolation` dành cho fault injection: dừng riêng Mermaid companion trước khi chạy và khởi động lại sau khi kiểm tra.
 
@@ -30,4 +30,4 @@ Các quy trình TLS, key rotation, update và rollback nằm trong [Infrastructu
 
 ## Phạm vi MVP
 
-MVP nhận `.mmd`, `.puml`, `.plantuml`, `.dot`, `.d2`; SVG là đầu ra mặc định và PNG dùng cho engine công bố hỗ trợ. Không tự quét source code ứng dụng để suy ra kiến trúc, không tự commit từ CI, và chưa có OIDC, playground, database, Redis hay SaaS billing.
+MVP nhận `.mmd`, `.puml`, `.plantuml`, `.dot`, `.d2`; SVG là đầu ra mặc định và PNG dùng cho engine công bố hỗ trợ. GitHub Action hỗ trợ API key, local no-auth và OIDC theo immutable repository policy. Sản phẩm không tự quét source code ứng dụng để suy ra kiến trúc, không tự commit từ CI, và chưa có playground, database, Redis hay SaaS billing.

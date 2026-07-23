@@ -187,6 +187,7 @@ Rate-limit integration test được phép dùng profile nhỏ hơn, ví dụ 6/
 | TC-SEC-010 | Log redaction | Structured log bật | Render private source với credential canary. | Log chỉ chứa metadata cho phép; không source/key/token. | P0 |
 | TC-SEC-011 | Output size | Renderer stream output vượt 10 MiB hoặc giới hạn cấu hình | Render qua Gateway. | Dừng đọc stream, trả 502 `RENDER_OUTPUT_TOO_LARGE`, không cache output. | P0 |
 | TC-SEC-012 | Output media type | Kroki trả 2xx nhưng sai `Content-Type`, SVG root sai hoặc PNG signature sai | Render qua Gateway. | Trả 502 `INVALID_RENDER_OUTPUT`, không cache output. | P0 |
+| TC-SEC-013 | OIDC JWKS | JWKS cache đã warm; provider có key mới hoặc tạm mất kết nối | Rotate `kid`, xác minh token mới, sau đó ngắt JWKS và thử token dùng key đã cache/chưa cache. | Key mới được refresh; key đã cache vẫn dùng được khi outage; key chưa có trả 503 xác định và không bypass signature. | P1 |
 
 ### 4.4 Health và hiệu năng
 
@@ -234,8 +235,8 @@ Rate-limit integration test được phép dùng profile nhỏ hơn, ví dụ 6/
 | TC-GHA-004 | Missing | Xóa generated file | Chạy check. | Fail, báo thiếu, upload output đề xuất. | P0 |
 | TC-GHA-005 | Artifact | Nhiều engine, một lỗi | Chạy check. | Artifact đúng path, không chứa secret/source ngoài cấu hình. | P1 |
 | TC-GHA-006 | API key | Private repo có secret | Chạy với key đúng rồi sai. | Đúng thì pass; sai fail rõ; key được mask khỏi log/artifact. | P0 |
-| TC-GHA-007 | OIDC | id-token: write; repo allowlisted | Chạy public/private repo không render secret. | Repo hợp lệ render; claim sai bị từ chối; không cần PAT. | P1 |
-| TC-GHA-008 | PR permission | Fork/untrusted PR; contents read | Chạy mode mặc định. | Không commit/push; không đưa secret vào fork; auth failure rõ nếu OIDC chưa có. | P0 |
+| TC-GHA-007 | OIDC | `id-token: write`; repo allowlisted | Chạy `auth-mode: oidc` trên public/private repo không truyền render secret; thử wrong audience/workflow và revoked policy. | Repo hợp lệ render; claim/policy sai bị từ chối; không cần PAT hoặc API-key secret. | P1 |
+| TC-GHA-008 | PR permission | Fork/untrusted PR; `contents: read`, `id-token: write` | Chạy `check` mặc định bằng OIDC. | Không commit/push, không đưa repository secret vào fork; token chỉ có render scope theo repository policy. | P0 |
 | TC-GHA-009 | Generate | Trusted branch; writable | Chạy generate, commit false. | Ghi đúng SVG/PNG; không commit; exit 0 khi thành công. | P0 |
 | TC-GHA-010 | Commit ảnh | Trusted push/manual; commit true; contents write | Đổi hai diagram và file không liên quan; chạy Action. | Một commit theo policy, chỉ stage generated output/manifest; ảnh đúng path/nội dung; file khác và source không bị sửa. | P0 |
 | TC-GHA-011 | Commit guard | PR/fork hoặc untrusted branch | Chạy với commit true. | Từ chối/bỏ qua commit có thông báo; không push hay mở rộng quyền. | P0 |

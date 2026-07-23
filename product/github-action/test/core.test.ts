@@ -87,6 +87,8 @@ test("validates all public Action inputs strictly", () => {
   assert.deepEqual(parseActionInputs({ "gateway-url": "https://diagrams.example.test/" }), {
     gatewayUrl: "https://diagrams.example.test",
     apiKey: undefined,
+    authMode: "auto",
+    oidcAudience: undefined,
     configPath: ".diagram.yml",
     mode: "check",
     changedOnly: true,
@@ -96,6 +98,7 @@ test("validates all public Action inputs strictly", () => {
   assert.throws(() => parseActionInputs({ "gateway-url": "file:///tmp/gateway" }), /HTTP\(S\)/);
   assert.throws(() => parseActionInputs({ "gateway-url": "https://user:secret@example.test" }), /embedded credentials/);
   assert.throws(() => parseActionInputs({ "gateway-url": "https://example.test", mode: "commit" }), /check.*generate/);
+  assert.throws(() => parseActionInputs({ "gateway-url": "https://example.test", "auth-mode": "pat" }), /auth-mode/);
   assert.throws(() => parseActionInputs({ "gateway-url": "https://example.test", "config-path": "../secret" }), /repository-relative/);
   assert.throws(() => parseActionInputs({ "gateway-url": "https://example.test", "changed-only": "yes" }), /true.*false/);
 });

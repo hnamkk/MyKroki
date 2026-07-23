@@ -17,11 +17,11 @@ export class GatewayFailure extends Error {
 
 const STATUS_MESSAGES: Readonly<Record<number, string>> = {
   400: "Gateway rejected the render request.",
-  401: "Gateway authentication failed. Configure 'api-key' for private Gateways; fork pull requests do not receive repository secrets.",
-  403: "Gateway denied this repository credential or it lacks diagram:render scope.",
+  401: "Gateway authentication failed. Verify 'auth-mode', OIDC audience/id-token permission, or the configured API key.",
+  403: "Gateway denied this repository/workflow policy or the principal lacks diagram:render scope.",
   422: "The diagram source is invalid.",
   429: "Gateway rate limit or render capacity was exceeded.",
-  503: "The requested renderer is unavailable.",
+  503: "A required Gateway dependency, renderer, or OIDC key provider is unavailable.",
   504: "The render exceeded the Gateway deadline.",
 };
 
@@ -42,12 +42,12 @@ function positiveInteger(value: string | null): number | undefined {
 
 export async function renderDiagram(
   baseUrl: string,
-  apiKey: string | undefined,
+  credential: string | undefined,
   request: RenderRequest,
   fetchImplementation: typeof fetch = fetch,
 ): Promise<Buffer> {
   const headers: Record<string, string> = { "content-type": "application/json" };
-  if (apiKey) headers.authorization = `Bearer ${apiKey}`;
+  if (credential) headers.authorization = `Bearer ${credential}`;
   let response: Response;
   try {
     response = await fetchImplementation(`${baseUrl}/api/v1/render`, {

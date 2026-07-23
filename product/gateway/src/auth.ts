@@ -4,9 +4,15 @@ export const RENDER_SCOPE = "diagram:render";
 
 export interface Principal {
   subject: string;
-  authMethod: "api-key" | "local";
+  authMethod: "api-key" | "github-oidc" | "local";
   scopes: readonly string[];
   cachePartition: string;
+  repositoryId?: string;
+  repositoryVisibility?: "public" | "private" | "internal";
+  workflowRef?: string;
+  eventName?: string;
+  ref?: string;
+  policyDecision?: "allowed";
 }
 
 export interface ApiKeyRecord {

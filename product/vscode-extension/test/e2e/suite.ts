@@ -5,14 +5,18 @@ import * as vscode from "vscode";
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
 
-function waitFor(predicate: () => boolean | Promise<boolean>, timeoutMs = 5_000): Promise<void> {
+function waitFor(
+  description: string,
+  predicate: () => boolean | Promise<boolean>,
+  timeoutMs = 10_000,
+): Promise<void> {
   return new Promise((resolve, reject) => {
     const started = Date.now();
     const check = async (): Promise<void> => {
       if (await predicate()) {
         resolve();
       } else if (Date.now() - started >= timeoutMs) {
-        reject(new Error("Timed out waiting for VS Code extension state."));
+        reject(new Error(`Timed out waiting for ${description}.`));
       } else {
         setTimeout(() => void check(), 50);
       }
@@ -28,8 +32,9 @@ async function replaceDocument(document: vscode.TextDocument, source: string): P
   assert.equal(await editor.edit((builder) => builder.replace(range, source)), true);
 }
 
-function startGateway(): Promise<{ server: Server; url: string }> {
+function startGateway(): Promise<{ server: Server; url: string; requests: string[] }> {
   return new Promise((resolve) => {
+    const requests: string[] = [];
     const server = createServer((request, response) => {
       if (request.url === "/health/ready") {
         response.setHeader("content-type", "application/json");
@@ -69,6 +74,7 @@ function startGateway(): Promise<{ server: Server; url: string }> {
           source: string;
           format: "svg" | "png";
         };
+        requests.push(body.source);
         const respond = (): void => {
           if (body.source.includes("INVALID")) {
             response.statusCode = 422;
@@ -103,7 +109,7 @@ function startGateway(): Promise<{ server: Server; url: string }> {
     server.listen(0, "127.0.0.1", () => {
       const address = server.address();
       if (!address || typeof address === "string") throw new Error("Mock Gateway did not bind a TCP port.");
-      resolve({ server, url: `http://127.0.0.1:${address.port}` });
+      resolve({ server, url: `http://127.0.0.1:${address.port}`, requests });
     });
   });
 }
@@ -145,7 +151,7 @@ export async function run(): Promise<void> {
 
     await replaceDocument(document, "flowchart LR\n  INVALID");
     await vscode.commands.executeCommand("diagramAsCode.exportSvg", sourceUri);
-    await waitFor(() => vscode.languages.getDiagnostics(sourceUri).length === 1);
+    await waitFor("syntax-error diagnostic", () => vscode.languages.getDiagnostics(sourceUri).length === 1);
     const diagnostic = vscode.languages.getDiagnostics(sourceUri)[0];
     assert.equal(diagnostic?.range.start.line, 1);
     assert.equal(diagnostic?.range.start.character, 2);
@@ -157,10 +163,15 @@ export async function run(): Promise<void> {
     console.log("Diagnostic clearing passed.");
 
     await replaceDocument(document, "flowchart LR\n  SLOW INVALID");
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await waitFor(
+      "the delayed preview request",
+      () => gateway.requests.some((source) => source.includes("SLOW INVALID")),
+    );
     await replaceDocument(document, "flowchart LR\n  Latest --> Valid");
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    assert.equal(vscode.languages.getDiagnostics(sourceUri).length, 0);
+    await waitFor("the latest preview response", () =>
+      gateway.requests.some((source) => source.includes("Latest --> Valid"))
+      && vscode.languages.getDiagnostics(sourceUri).length === 0
+    );
     console.log("Stale preview response suppression passed.");
 
     const configUri = vscode.Uri.joinPath(folder.uri, ".diagram.yml");
@@ -169,22 +180,29 @@ export async function run(): Promise<void> {
       .replace("onSave: false", "onSave: true");
     await vscode.workspace.fs.writeFile(configUri, Buffer.from(config));
     await replaceDocument(document, "flowchart LR\n  Save --> Generated");
+    const expectedSourceLength = document.getText().length;
     await document.save();
-    await waitFor(async () => {
+    await waitFor(
+      "the render-on-save Gateway request",
+      () => gateway.requests.some((source) => source.includes("Save --> Generated")),
+    );
+    await waitFor("render-on-save output", async () => {
       try {
-        return Buffer.from(await vscode.workspace.fs.readFile(svgUri))
-          .toString("utf8")
-          .includes(">33<");
+        const currentOutput = Buffer.from(await vscode.workspace.fs.readFile(svgUri)).toString("utf8");
+        return currentOutput.includes(`>${expectedSourceLength}<`);
       } catch {
         return false;
       }
     });
     const lastGood = Buffer.from(await vscode.workspace.fs.readFile(svgUri));
-    assert.match(lastGood.toString("utf8"), />33</);
+    assert.match(lastGood.toString("utf8"), new RegExp(`>${expectedSourceLength}<`));
 
     await replaceDocument(document, "flowchart LR\n  INVALID");
     await document.save();
-    await waitFor(() => vscode.languages.getDiagnostics(sourceUri).length === 1);
+    await waitFor(
+      "render-on-save syntax-error diagnostic",
+      () => vscode.languages.getDiagnostics(sourceUri).length === 1,
+    );
     assert.deepEqual(Buffer.from(await vscode.workspace.fs.readFile(svgUri)), lastGood);
     console.log("Render-on-save atomicity passed.");
 

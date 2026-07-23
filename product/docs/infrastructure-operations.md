@@ -40,6 +40,37 @@ Khi cấp key, lưu plaintext vào VS Code SecretStorage hoặc GitHub Secret; c
 
 `DIAGRAM_API_KEYS` dạng plaintext chỉ còn để tương thích cấu hình cũ và không nên dùng cho deployment mới. Không có admin API trong MVP; thay đổi lifecycle là thao tác có kiểm soát trên mounted secret/config.
 
+## GitHub OIDC và repository policy
+
+Bật `GITHUB_OIDC_ENABLED=true`, đặt custom `GITHUB_OIDC_AUDIENCE`, rồi cấu hình `GITHUB_OIDC_REPOSITORY_POLICIES` dưới dạng JSON. Gateway có thể chạy OIDC-only với `DIAGRAM_API_KEY_RECORDS` rỗng.
+
+```json
+[
+  {
+    "repositoryId": "123456789",
+    "workflowRefs": [
+      "owner/repository/.github/workflows/diagram-check.yml@refs/*"
+    ],
+    "events": {
+      "pull_request": {
+        "refs": ["refs/pull/*"],
+        "baseRefs": ["main"]
+      },
+      "push": {
+        "refs": ["refs/heads/main"]
+      },
+      "workflow_dispatch": {
+        "refs": ["refs/heads/main"]
+      }
+    }
+  }
+]
+```
+
+Chỉ một wildcard ở cuối pattern được hỗ trợ. Quyền được gắn với immutable `repositoryId`; tên repository trong workflow ref chỉ giới hạn file workflow, không thay thế repository ID. Đặt `status: "revoked"` để thu hồi policy. `pull_request_target` không được hỗ trợ. Action phải có `id-token: write`, dùng `auth-mode: oidc` và audience trùng Gateway.
+
+Gateway mặc định tin issuer/JWKS chính thức của GitHub. Các biến `GITHUB_OIDC_ISSUER`, `GITHUB_OIDC_JWKS_URL`, clock tolerance, cache age, cooldown và timeout chỉ nên đổi cho trust domain được kiểm soát. Khi JWKS tạm lỗi, key đã cache vẫn hoạt động; token dùng key chưa cache nhận 503 và `Retry-After`.
+
 ## Giám sát tối thiểu
 
 Theo dõi HTTP 5xx, thời gian render, memory/container restart, bulkhead queue và cache hit/miss tại `/metrics`. Endpoint metrics chỉ tồn tại khi `METRICS_ENABLED=true`; khi Gateway truy cập được từ Internet, reverse proxy phải giới hạn endpoint này cho mạng vận hành. Cảnh báo khi `/health/ready` lỗi liên tục trên 2 phút. LRU, single-flight và token bucket chỉ có hiệu lực trong từng Gateway replica; MVP nên bắt đầu với một replica.

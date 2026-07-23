@@ -7,6 +7,7 @@ import { parseDiagramConfig } from "@diagram-as-code/diagram-config";
 import fastGlob from "fast-glob";
 
 import { uploadPreviewArtifact } from "./artifact.js";
+import { resolveGatewayCredential } from "./auth-provider.js";
 import { parseActionInputs, parseNameStatus, resolveWithinRoot, type FileChange } from "./core.js";
 import { renderDiagram } from "./gateway-client.js";
 import { createRenderRequest, runAction, type ActionOutcome, type RunActionResult } from "./runner.js";
@@ -97,13 +98,19 @@ async function run(): Promise<void> {
   const inputs = parseActionInputs({
     "gateway-url": core.getInput("gateway-url"),
     "api-key": core.getInput("api-key"),
+    "auth-mode": core.getInput("auth-mode"),
+    "oidc-audience": core.getInput("oidc-audience"),
     "config-path": core.getInput("config-path"),
     mode: core.getInput("mode"),
     "changed-only": core.getInput("changed-only"),
     "artifact-name": core.getInput("artifact-name"),
     "fail-on-stale": core.getInput("fail-on-stale"),
   });
-  if (inputs.apiKey) core.setSecret(inputs.apiKey);
+  const gatewayCredential = await resolveGatewayCredential(inputs, {
+    getIdToken: (audience) => core.getIDToken(audience),
+    setSecret: (value) => core.setSecret(value),
+    warning: (message) => core.warning(message),
+  });
 
   const event = readEvent();
   if (inputs.mode === "generate" && isPullRequest()) {
@@ -134,7 +141,7 @@ async function run(): Promise<void> {
     { root, config, inputs, allSources, generatedFiles, changes: changes ?? [], forceAll },
     {
       render: (sourcePath, source, diagramConfig) =>
-        renderDiagram(inputs.gatewayUrl, inputs.apiKey, createRenderRequest(sourcePath, source, diagramConfig)),
+        renderDiagram(inputs.gatewayUrl, gatewayCredential, createRenderRequest(sourcePath, source, diagramConfig)),
       publish: uploadPreviewArtifact,
       reporter: {
         error: (message, properties) => core.error(message, properties),

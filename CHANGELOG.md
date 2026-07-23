@@ -20,6 +20,7 @@ versioned entry and uses it as the GitHub release notes.
 - Complete the GitHub Action MVP with strict inputs and workspace path guards, read-only stale/orphan checks, renderer annotations, safe preview artifacts, API-key masking, Gateway failure taxonomy, changed-file planning, and transactional generate mode guarded from pull requests.
 - Complete the VS Code Extension MVP with five diagram file types, stale-safe live preview, line/column diagnostics, SVG/PNG export, optional atomic render-on-save, Gateway discovery, SecretStorage credentials, zoom controls, and strict webview CSP.
 - Add packaged VSIX installation and Extension Host E2E gates for VS Code 1.100, current Stable, Linux, and Windows, plus a real-Gateway Compose smoke.
+- Add GitHub Actions OIDC authentication with configurable issuer/audience/JWKS rotation, immutable repository/workflow/event/ref policy, public/private/fork PR support, redacted policy audit events, and explicit Action auth modes with API-key fallback.
 
 ### Changed
 
@@ -30,6 +31,7 @@ versioned entry and uses it as the GitHub release notes.
 ### Fixed
 
 - Make the bundled GitHub Action start correctly on the Node.js 24 runner by preserving `import.meta.url` semantics in its CommonJS bundle.
+- Stabilize the VS Code Windows Extension Host gate by isolating VS Code mutexes, separating preview and render-on-save request lanes, and making the render-on-save E2E assertions line-ending agnostic.
 
 ## [0.31.1] - 2026-07-15
 

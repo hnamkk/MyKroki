@@ -24,11 +24,12 @@ const extensionsDirectory = path.join(temporaryRoot, "extensions");
 const userDataDirectory = path.join(temporaryRoot, "user-data");
 const vsix = path.join(extensionRoot, "dist", "diagram-as-code-vscode.vsix");
 
-async function disableWindowsInstallerMutex(vscodeExecutablePath) {
+async function isolateWindowsMutexes(vscodeExecutablePath) {
   if (process.platform !== "win32") return;
 
-  // Archive builds cannot self-update, but still honor the machine-wide
-  // Inno Setup mutex used by the preinstalled VS Code on Windows runners.
+  // Archive builds share the same updater and singleton mutex names as the
+  // preinstalled VS Code on hosted Windows runners unless product metadata is
+  // isolated before invoking either the CLI or Extension Host.
   const executableRoot = path.dirname(vscodeExecutablePath);
   const entries = await readdir(executableRoot, { withFileTypes: true });
   const roots = [
@@ -41,10 +42,9 @@ async function disableWindowsInstallerMutex(vscodeExecutablePath) {
     const productJsonPath = path.join(root, "resources", "app", "product.json");
     try {
       const product = JSON.parse(await readFile(productJsonPath, "utf8"));
-      if (product.win32VersionedUpdate !== false) {
-        product.win32VersionedUpdate = false;
-        await writeFile(productJsonPath, `${JSON.stringify(product, null, 2)}\n`);
-      }
+      product.win32VersionedUpdate = false;
+      product.win32MutexName = `vscode-diagram-as-code-e2e-${process.pid}`;
+      await writeFile(productJsonPath, `${JSON.stringify(product, null, 2)}\n`);
       return;
     } catch (error) {
       if (error.code !== "ENOENT") throw error;
@@ -58,7 +58,7 @@ try {
     recursive: true,
   });
   const vscodeExecutablePath = await downloadAndUnzipVSCode({ version });
-  await disableWindowsInstallerMutex(vscodeExecutablePath);
+  await isolateWindowsMutexes(vscodeExecutablePath);
   const profileArgs = [
     `--extensions-dir=${extensionsDirectory}`,
     `--user-data-dir=${userDataDirectory}`,

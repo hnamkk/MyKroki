@@ -7,15 +7,81 @@ import { loadGatewayConfig } from "../dist/config.js";
 test("requires at least one active key when authentication is required", () => {
   assert.throws(
     () => loadGatewayConfig({ AUTH_MODE: "required", DIAGRAM_API_KEYS: "" }),
-    /At least one active API key record/,
+    /At least one active API key or GitHub OIDC/,
   );
   assert.throws(
     () => loadGatewayConfig({
       AUTH_MODE: "required",
       DIAGRAM_API_KEY_RECORDS: JSON.stringify([{ id: "old", verifier: apiKeyVerifier("old"), scopes: ["diagram:render"], status: "revoked" }]),
     }),
-    /At least one active API key record/,
+    /At least one active API key or GitHub OIDC/,
   );
+});
+
+test("loads GitHub OIDC trust and immutable repository policy without an API key", () => {
+  const config = loadGatewayConfig({
+    AUTH_MODE: "required",
+    GITHUB_OIDC_ENABLED: "true",
+    GITHUB_OIDC_AUDIENCE: "diagram-gateway",
+    GITHUB_OIDC_REPOSITORY_POLICIES: JSON.stringify([{
+      repositoryId: "123456",
+      workflowRefs: ["octo/diagrams/.github/workflows/diagram-check.yml@refs/*"],
+      events: {
+        pull_request: { refs: ["refs/pull/*"], baseRefs: ["main"] },
+        push: { refs: ["refs/heads/main"] },
+      },
+    }]),
+  });
+  assert.equal(config.apiKeyRecords.length, 0);
+  assert.equal(config.githubOidc?.issuer, "https://token.actions.githubusercontent.com");
+  assert.equal(config.githubOidc?.audience, "diagram-gateway");
+  assert.deepEqual(config.githubOidc?.repositoryPolicies[0], {
+    repositoryId: "123456",
+    status: "active",
+    scopes: ["diagram:render"],
+    cachePartition: "github:123456",
+    workflowRefs: ["octo/diagrams/.github/workflows/diagram-check.yml@refs/*"],
+    events: {
+      pull_request: { refs: ["refs/pull/*"], baseRefs: ["main"] },
+      push: { refs: ["refs/heads/main"] },
+    },
+  });
+});
+
+test("fails fast for incomplete or ambiguous GitHub OIDC policy", () => {
+  assert.throws(() => loadGatewayConfig({
+    AUTH_MODE: "required",
+    GITHUB_OIDC_ENABLED: "true",
+    GITHUB_OIDC_REPOSITORY_POLICIES: "[]",
+  }), /GITHUB_OIDC_AUDIENCE/);
+  assert.throws(() => loadGatewayConfig({
+    AUTH_MODE: "required",
+    GITHUB_OIDC_ENABLED: "true",
+    GITHUB_OIDC_AUDIENCE: "diagram-gateway",
+    GITHUB_OIDC_REPOSITORY_POLICIES: "[]",
+  }), /active GitHub repository policy/);
+  assert.throws(() => loadGatewayConfig({
+    AUTH_MODE: "required",
+    GITHUB_OIDC_ENABLED: "true",
+    GITHUB_OIDC_AUDIENCE: "diagram-gateway",
+    GITHUB_OIDC_REPOSITORY_POLICIES: JSON.stringify([{
+      repositoryId: "123456",
+      workflowRefs: ["workflow.yml@refs/*/unsafe"],
+      events: { push: { refs: ["refs/heads/main"] } },
+    }]),
+  }), /trailing wildcard/);
+  assert.throws(() => loadGatewayConfig({
+    AUTH_MODE: "required",
+    DEPLOYMENT_PROFILE: "production",
+    GITHUB_OIDC_ENABLED: "true",
+    GITHUB_OIDC_AUDIENCE: "diagram-gateway",
+    GITHUB_OIDC_JWKS_URL: "http://keys.example.test/jwks",
+    GITHUB_OIDC_REPOSITORY_POLICIES: JSON.stringify([{
+      repositoryId: "123456",
+      workflowRefs: ["workflow.yml@refs/*"],
+      events: { push: { refs: ["refs/heads/main"] } },
+    }]),
+  }), /GITHUB_OIDC_JWKS_URL must use HTTPS/);
 });
 
 test("hashes legacy plaintext keys immediately for compatibility", () => {
