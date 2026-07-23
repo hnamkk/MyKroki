@@ -152,7 +152,7 @@ export function deterministicRenderRequest(
 
   const settings = effectiveRenderSettings(normalizedPath, config);
   const options: NonNullable<RenderRequest["options"]> = {
-    theme: settings.theme,
+    ...(settings.theme === "default" ? {} : { theme: settings.theme }),
     ...settings.options,
   };
   if (engine === "mermaid") {

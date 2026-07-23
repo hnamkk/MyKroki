@@ -1,0 +1,8 @@
+@startuml
+!include <C4/C4_Context>
+Person(developer, "Developer")
+System(gateway, "Diagram Gateway")
+System_Ext(github, "GitHub Actions")
+Rel(developer, gateway, "Previews and exports diagrams")
+Rel(github, gateway, "Checks generated artifacts")
+@enduml

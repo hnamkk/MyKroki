@@ -1,4 +1,4 @@
-name: CI (nightly)
+name: Upstream Kroki CI (nightly)
 
 on:
   schedule:

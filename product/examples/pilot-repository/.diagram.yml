@@ -1,0 +1,24 @@
+version: 1
+
+sources:
+  - diagrams/**/*.mmd
+  - diagrams/**/*.puml
+  - diagrams/**/*.dot
+  - diagrams/**/*.d2
+
+output: generated
+
+defaults:
+  format: svg
+  theme: default
+
+engines:
+  graphviz:
+    options:
+      layout: dot
+
+preview:
+  debounceMs: 400
+
+render:
+  onSave: false

@@ -1,0 +1,18 @@
+version: 1
+
+sources:
+  - product/examples/pilot-repository/diagrams/**/*.mmd
+  - product/examples/pilot-repository/diagrams/**/*.puml
+  - product/examples/pilot-repository/diagrams/**/*.dot
+  - product/examples/pilot-repository/diagrams/**/*.d2
+
+output: product/examples/pilot-repository/generated
+
+defaults:
+  format: svg
+  theme: default
+
+engines:
+  graphviz:
+    options:
+      layout: dot

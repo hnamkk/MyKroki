@@ -60,7 +60,7 @@ Sau khi hoàn thành OIDC/repository policy ở Phase 5, phần còn lại của
 | 3 | GitHub Action MVP | Hoàn thiện `check`, artifact, annotation và `generate` | Phase 1, 2 | Đã hoàn thành |
 | 4 | VS Code Extension MVP | Hoàn thiện diagnostics, export, render-on-save và UX preview | Phase 1, 2 | Đã hoàn thành |
 | 5 | OIDC và policy | Hỗ trợ GitHub public/private không phụ thuộc repository secret | Phase 1, 3 | Đã hoàn thành |
-| 6 | Reliability và quality gates | E2E, performance, security và flaky-test control | Phase 1-5 | 6-10 ngày công |
+| 6 | Reliability và quality gates | E2E, performance, security và flaky-test control | Phase 1-5 | Triển khai hoàn tất; chờ 3 lần full CI xanh liên tiếp |
 | 7 | Pilot và phát hành | Tài liệu, packaging, upgrade/rollback và pilot repository | Phase 6 | 4-7 ngày công |
 | 8 | Sau MVP | Redis, playground, trusted commit và renderer mở rộng | Phase 7 | Lập kế hoạch riêng |
 
@@ -324,6 +324,10 @@ Cho GitHub Action gọi hosted Gateway mà không cần repository secret, đồ
 
 Chứng minh hệ thống ổn định trong điều kiện tải, lỗi dependency và quy trình CI lặp lại.
 
+### Trạng thái
+
+Đã hoàn tất triển khai ngày 2026-07-23. Reference stack đã vượt qua renderer acceptance, security abuse, performance, soak, dependency recovery, deterministic-output và container-policy gates trên các image được build từ cùng source. Phase gate chỉ được đánh dấu `Done` sau khi branch có ba lần full Product CI liên tiếp xanh theo exit criteria; đây là bằng chứng CI còn phải thu thập, không phải hạng mục code còn thiếu.
+
 ### Work packages
 
 | ID | Công việc | Deliverable | Requirement/Test | Priority |
@@ -337,6 +341,31 @@ Chứng minh hệ thống ổn định trong điều kiện tải, lỗi depende
 | P6-07 | Flaky control | Lặp unit/integration, timeout budget, lưu report; quarantine không được dùng cho P0 | Test Plan 2.2 | P0 |
 | P6-08 | CI matrix | Node 24, Java 25, Linux runner; Windows cho Extension/path tests | Constraints/Test Environment | P0 |
 | P6-09 | Supply chain | Audit dependency, image scan, SBOM/checksum, pinned Action/image references | NFR-SEC-005, NFR-CMU-003 | P1 |
+
+### Deliverable đã triển khai
+
+| Work package | Bằng chứng triển khai |
+|---|---|
+| P6-01 | Product CI dựng Gateway/Kroki/Mermaid từ cùng checkout và chạy smoke, renderer acceptance, Action/VS Code Gateway smoke cho JSON, text POST, encoded GET, SVG và PNG được hỗ trợ. |
+| P6-02 | `test:recovery` kiểm tra liveness/readiness, render độc lập khi Mermaid down, tự phục hồi sau start/restart; Gateway integration test dùng backend HTTP treo thật để xác nhận timeout và slot kế tiếp hoạt động; cache-failure degradation được giữ trong Gateway test. |
+| P6-03 | `test:performance` xuất JSON cho health p95, cache-hit p95, render từng engine và workspace 100 diagram; ngưỡng Must làm fail test. |
+| P6-04 | `test:soak` tạo tải no-store đồng thời, kiểm tra active/queued không vượt bulkhead và trở về 0; CI lưu container stats trước/sau. |
+| P6-05 | `test:security` bao phủ malformed JSON, auth sai/thiếu, oversized/decompression bomb, encoded input lỗi, traversal và metric redaction; renderer acceptance giữ secure include; CI kiểm tra canary không xuất hiện trong log. |
+| P6-06 | Determinism suite lưu SHA-256 từng engine/alias, giữ cache bypass và so baseline trước/sau restart backend. |
+| P6-07 | `test:repeat` chạy Gateway unit/integration ba vòng với deadline từng vòng và report JSON; P0 không có quarantine. |
+| P6-08 | Product CI dùng Node.js 24, Java 25 và Ubuntu 24.04; Extension Host giữ matrix Linux/Windows và VS Code minimum/Stable. |
+| P6-09 | External Actions được pin commit SHA; CI sinh npm/container SBOM, quét image build hiện tại bằng Trivy và fail với mọi High/Critical; runtime Kroki loại build/header packages sau assembly; Compose áp dụng non-root, read-only rootfs, dropped capabilities, no-new-privileges và CPU/RAM/PID limits. |
+
+### Baseline cục bộ gần nhất
+
+| Gate | Kết quả ngày 2026-07-23 |
+|---|---|
+| Security và renderer acceptance | Pass toàn bộ bốn engine MVP, PNG hỗ trợ, invalid source, include security và abuse input. |
+| Performance | Health p95 3.1 ms; cache-hit p95 7.4 ms; render p95 lớn nhất 0.9 giây; workspace 100 diagram 24.8 giây. |
+| Soak | 60 giây, concurrency 12, 73/73 request thành công; active tối đa 4, queue tối đa 8, kết thúc 0/0. |
+| Recovery | Mermaid down: ready 503 nhưng ba engine độc lập vẫn hoạt động; start/restart tự trở lại ready 200. |
+| Determinism | Mermaid, PlantUML, C4, Graphviz/DOT và D2 giữ nguyên SHA-256 qua restart. |
+| Supply chain | Gateway, Kroki và Mermaid image build từ source có 0 High/Critical theo Trivy, kể cả advisory chưa có bản vá; container policy pass. |
 
 ### Exit criteria
 
@@ -352,6 +381,10 @@ Chứng minh hệ thống ổn định trong điều kiện tải, lỗi depende
 
 Đưa sản phẩm vào một repository thật với hướng dẫn setup ngắn, có khả năng rollback và dữ liệu phản hồi.
 
+### Trạng thái
+
+Đã hoàn tất phần triển khai trong repository: version/schema/image lock, pilot fixture bốn engine, release bundle có SBOM/manifest/checksum, tagged workflow publish ba image cùng version/digest, operations/release runbook, E2E setup guide và go/no-go checklist. Phase chỉ được đánh dấu `Done` sau khi có ba full Product CI xanh liên tiếp, pilot PR thật, rehearsal upgrade/rollback bằng hai version và mentor acceptance sign-off.
+
 ### Work packages
 
 | ID | Công việc | Deliverable | Priority |
@@ -363,6 +396,18 @@ Chứng minh hệ thống ổn định trong điều kiện tải, lỗi depende
 | P7-05 | Acceptance session | Demo theo use case SRS; lưu issue và quyết định scope còn lại | P0 |
 | P7-06 | Release artifacts | Gateway image, Compose, VSIX, Action bundle, example config, SBOM/checksum, release notes | P0 |
 | P7-07 | Go/no-go review | Security, NFR, test report, known limitations và rollback owner | P0 |
+
+### Deliverable đã triển khai
+
+| Work package | Bằng chứng |
+|---|---|
+| P7-01 | `.diagram-renderer.lock` khóa Gateway, config schema, Kroki/Mermaid; release manifest khóa ba image cùng tag và digest khi publish. |
+| P7-02 | `docs/E2E_SETUP_GUIDE.md` bao phủ Compose, API key/OIDC, VSIX, Action và `.diagram.yml`. |
+| P7-03 | `product/docs/infrastructure-operations.md` bao phủ health, logs, metrics, key rotation, backup, upgrade và rollback. |
+| P7-04 | `product/examples/pilot-repository` có Mermaid, C4-PlantUML, Graphviz và D2 cùng generated SVG/workflow pin version. |
+| P7-05 | Acceptance matrix và biên bản mẫu nằm trong E2E guide/go-no-go checklist; buổi sign-off thực tế còn cần mentor. |
+| P7-06 | `release:prepare` tạo VSIX, Action bundle, Compose/env/config lock, npm SBOM, manifest/checksum; tagged workflow publish và thêm SBOM ba image. |
+| P7-07 | `product/docs/go-no-go-checklist.md` công bố external gates, known limitations, owner và No-Go conditions. |
 
 ### Exit criteria
 
@@ -440,6 +485,8 @@ Một work package chỉ được hoàn thành khi:
 | In-memory state khi scale | Rate/cache không nhất quán | Một replica MVP, adapter Redis sau số liệu | Yêu cầu HA hoặc nhiều replica production. |
 | CI E2E tốn thời gian | Feedback chậm/flaky | Tách PR smoke và nightly soak, cache image | PR gate thường xuyên vượt 15 phút hoặc flaky. |
 
+Baseline vận hành cá nhân giữ `Diagram check` tự động cho PR nội bộ và push `main` trên self-hosted runner/Gateway local. Upstream Kroki CI chỉ tự kích hoạt khi server, renderer cục bộ hoặc packaging liên quan thay đổi; Mermaid giữ workflow theo path riêng; deployment docs và thông báo hạ tầng upstream chuyển sang manual. PR dùng quick gates: Product quality/Java/Extension Host và Upstream Java regression. Product Compose cùng Upstream image build/smoke chỉ chạy push `main`, manual candidate hoặc nightly call; ba full CI evidence không được lấy từ PR quick runs.
+
 ## 18. Báo cáo tiến độ
 
 Mỗi phase duy trì một bảng trạng thái ngắn trong issue/milestone, không sửa lịch sử requirement:
@@ -458,12 +505,11 @@ Cuối mỗi phase cần review exit criteria và quyết định `Go`, `Conditi
 
 ## 19. Thứ tự công việc ngay tiếp theo
 
-Backlog bắt đầu nên theo thứ tự:
+Implementation Phase 1-7 trong repository đã hoàn tất. Công việc tiếp theo theo thứ tự:
 
-1. Khóa Gateway/renderer contract đã hoàn thành từ phase 2.
-2. GitHub Action MVP phase 3 đã hoàn thành.
-3. VS Code Extension MVP phase 4 đã hoàn thành.
-4. OIDC/repository policy phase 5 đã hoàn thành.
-5. Tiếp theo triển khai reliability và quality gates phase 6.
-
-Phase 6 dùng các OIDC/policy fixture của phase 5 để mở rộng Compose E2E, security và flaky-test control.
+1. Commit/push candidate và thu thập ba full Product CI xanh liên tiếp.
+2. Tạo repository pilot thật từ `product/examples/pilot-repository`.
+3. Chạy toàn bộ `docs/E2E_SETUP_GUIDE.md`, gồm PR stale/syntax, VS Code workflow và OIDC public/private phù hợp môi trường.
+4. Diễn tập upgrade/rollback bằng hai artifact versioned và chỉ định rollback owner.
+5. Tổ chức mentor acceptance, điền `product/docs/go-no-go-checklist.md` và chốt Go/No-Go.
+6. Chỉ lập backlog Phase 8 sau khi Phase 7 có đủ external evidence và không còn P0/P1 blocker.

@@ -5,6 +5,7 @@ concurrency:
   cancel-in-progress: true
 
 on:
+  workflow_dispatch:
   push:
     branches: [main]
     paths:
@@ -21,6 +22,9 @@ on:
       - "docker-bake.hcl"
       - "pom.xml"
       - ".github/workflows/product-ci.yml"
+      - ".github/workflows/product-release.yml"
+      - ".github/workflows/diagram-check.yml"
+      - ".diagram-pilot.yml"
   pull_request:
     paths:
       - "product/**"
@@ -36,14 +40,17 @@ on:
       - "docker-bake.hcl"
       - "pom.xml"
       - ".github/workflows/product-ci.yml"
+      - ".github/workflows/product-release.yml"
+      - ".github/workflows/diagram-check.yml"
+      - ".diagram-pilot.yml"
 
 jobs:
   quality:
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: npm
@@ -56,16 +63,69 @@ jobs:
         working-directory: product
       - run: npm test
         working-directory: product
+      - name: Repeat Gateway unit and integration tests
+        run: node scripts/repeat-test.mjs --attempts 3 --timeout-ms 180000 --report test-results/flaky-control.json -- npm --workspace=@diagram-as-code/gateway test
+        working-directory: product
       - run: npm run build
+        working-directory: product
+      - name: Generate npm dependency SBOM
+        run: npm run release:sbom
+        working-directory: product
+      - name: Verify reproducible npm SBOM
+        run: |
+          before="$(sha256sum test-results/product-npm.spdx.json | cut -d ' ' -f 1)"
+          npm run release:sbom
+          after="$(sha256sum test-results/product-npm.spdx.json | cut -d ' ' -f 1)"
+          test "${before}" = "${after}"
         working-directory: product
       - name: Ensure the committed Action bundle is current
         run: git diff --exit-code -- product/github-action/dist/index.cjs
       - run: npm --workspace=diagram-as-code-vscode run package
         working-directory: product
-      - uses: actions/upload-artifact@v6
+      - name: Verify reproducible VSIX packaging
+        run: |
+          before="$(sha256sum vscode-extension/dist/diagram-as-code-vscode.vsix | cut -d ' ' -f 1)"
+          npm --workspace=diagram-as-code-vscode run package
+          after="$(sha256sum vscode-extension/dist/diagram-as-code-vscode.vsix | cut -d ' ' -f 1)"
+          test "${before}" = "${after}"
+        working-directory: product
+      - name: Verify Phase 7 release bundle
+        run: |
+          npm run release:bundle
+          npm run release:verify
+          release_tag="product-v$(node -p 'require("./package.json").version')"
+          before="$(sha256sum "release/${release_tag}/SHA256SUMS" | cut -d ' ' -f 1)"
+          npm run release:bundle
+          npm run release:verify
+          after="$(sha256sum "release/${release_tag}/SHA256SUMS" | cut -d ' ' -f 1)"
+          test "${before}" = "${after}"
+        working-directory: product
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: diagram-as-code-vscode
           path: product/vscode-extension/dist/*.vsix
+      - name: Upload quality and supply-chain reports
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: product-quality-reports
+          path: product/test-results/
+          if-no-files-found: warn
+
+  java-quality:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
+        with:
+          java-version: 25
+          distribution: temurin
+          cache: maven
+      - name: Install Graphviz test dependency
+        run: sudo apt-get update && sudo apt-get install --yes graphviz
+      - name: Run Kroki fork regression tests on Java 25
+        run: ./mvnw --no-transfer-progress test
 
   vscode-extension-host:
     runs-on: ${{ matrix.os }}
@@ -81,8 +141,8 @@ jobs:
           - os: windows-2025
             vscode-version: stable
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
           cache: npm
@@ -103,17 +163,18 @@ jobs:
           VSCODE_TEST_VERSION: ${{ matrix.vscode-version }}
 
   compose:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
       KROKI_IMAGE: yuzutech/kroki:product-ci
       MERMAID_IMAGE: yuzutech/kroki-mermaid:product-ci
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6
         with:
           node-version: 24
-      - uses: actions/setup-java@v5
+      - uses: actions/setup-java@03ad4de0992f5dab5e18fcb136590ce7c4a0ac95 # v5
         with:
           java-version: 25
           distribution: temurin
@@ -122,14 +183,14 @@ jobs:
         working-directory: product
       - name: Package Kroki server for the container image
         run: ./mvnw --no-transfer-progress -DskipTests package
-      - uses: docker/setup-buildx-action@v4
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4
         with:
           version: v0.34.1
           buildkitd-config-inline: |
             [worker.oci]
               max-parallelism = 2
       - name: Restore fork image layers
-        uses: actions/cache@v5
+        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5
         with:
           path: /tmp/.product-buildx-cache
           key: ${{ runner.os }}-product-buildx-${{ hashFiles('docker-bake.hcl', 'server/ops/docker/Dockerfile', 'server/pom.xml', 'mermaid/Dockerfile', '**/package-lock.json', 'vega/deno.lock', 'lib/browser-instance/**') }}
@@ -163,8 +224,65 @@ jobs:
         env:
           DIAGRAM_API_KEY_RECORDS: '[{"id":"ci","verifier":"sha256:f82da6e2b2e51c046a2eaf10964ef184b69c0aee9892f10a2a7b657477d407e6","scopes":["diagram:render"],"cachePartition":"ci","status":"active"}]'
           GATEWAY_PORT: 19000
+          RATE_LIMIT_PER_MINUTE: 100000
+          RATE_LIMIT_BURST: 1000
         run: timeout --signal=TERM --kill-after=1m 10m docker compose -p diagram-product-ci --env-file .env.example up -d --build
         working-directory: product/deploy
+      - name: Prepare reliability report directory
+        run: mkdir -p product/test-results
+      - name: Generate container SBOMs
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: diagram-as-code-gateway:local
+          artifact-name: diagram-gateway-sbom.spdx.json
+          output-file: product/test-results/diagram-gateway.spdx.json
+          format: spdx-json
+      - name: Generate Kroki container SBOM
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: yuzutech/kroki:product-ci
+          artifact-name: diagram-kroki-sbom.spdx.json
+          output-file: product/test-results/diagram-kroki.spdx.json
+          format: spdx-json
+      - name: Generate Mermaid container SBOM
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: yuzutech/kroki-mermaid:product-ci
+          artifact-name: diagram-mermaid-sbom.spdx.json
+          output-file: product/test-results/diagram-mermaid.spdx.json
+          format: spdx-json
+      - name: Install pinned Trivy scanner
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: v0.69.3
+          cache: true
+      - name: Scan Gateway image for fixable high vulnerabilities
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        with:
+          image-ref: diagram-as-code-gateway:local
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          skip-setup-trivy: true
+      - name: Scan Kroki image for fixable high vulnerabilities
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        with:
+          image-ref: yuzutech/kroki:product-ci
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          skip-setup-trivy: true
+      - name: Scan Mermaid image for fixable high vulnerabilities
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        with:
+          image-ref: yuzutech/kroki-mermaid:product-ci
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          skip-setup-trivy: true
+      - name: Verify container runtime confinement
+        env:
+          CONTAINER_POLICY_TARGETS: diagram-product-ci-gateway-1,diagram-product-ci-kroki-1,diagram-product-ci-mermaid-1
+          QUALITY_REPORT_PATH: test-results/container-policy.json
+        run: npm run test:container-policy
+        working-directory: product
       - name: Smoke renderers
         env:
           DIAGRAM_GATEWAY_URL: http://localhost:19000
@@ -176,6 +294,14 @@ jobs:
           DIAGRAM_GATEWAY_URL: http://localhost:19000
           DIAGRAM_API_KEY: ci-secret
         run: timeout --signal=TERM --kill-after=1m 3m npm run test:vscode-gateway
+        working-directory: product
+      - name: Verify four-engine pilot repository
+        env:
+          DIAGRAM_GATEWAY_URL: http://localhost:19000
+          DIAGRAM_API_KEY: ci-secret
+        run: |
+          timeout --signal=TERM --kill-after=1m 5m npm run pilot:generate
+          git diff --exit-code -- examples/pilot-repository/generated
         working-directory: product
       - name: Prepare GitHub Action E2E fixture
         env:
@@ -194,7 +320,6 @@ jobs:
               format: "svg",
               source,
               options: {
-                theme: "default",
                 "deterministic-ids": true,
                 "deterministic-id-seed": "product/github-action/e2e/diagrams/workflow.mmd"
               }
@@ -317,18 +442,100 @@ jobs:
           DIAGRAM_API_KEY: ci-secret
         run: timeout --signal=TERM --kill-after=1m 10m npm run test:renderers
         working-directory: product
-      - name: Verify deterministic renderer output without Gateway cache
-        run: timeout --signal=TERM --kill-after=1m 8m docker compose -p diagram-product-ci --env-file .env.example exec -T -e KROKI_DIRECT_URL=http://kroki:8000 gateway node scripts/determinism-test.mjs
+      - name: Run security abuse suite
+        env:
+          DIAGRAM_GATEWAY_URL: http://localhost:19000
+          DIAGRAM_API_KEY: ci-secret
+          QUALITY_REPORT_PATH: test-results/security.json
+        run: timeout --signal=TERM --kill-after=1m 5m npm run test:security
+        working-directory: product
+      - name: Verify source and credential canaries are absent from logs
+        run: |
+          logs="$(docker compose -p diagram-product-ci --env-file .env.example logs --no-color gateway)"
+          if grep -Fq -e 'PRIVATE_DIAGRAM_SOURCE_CANARY' -e 'ci-secret' <<<"${logs}"; then
+            echo "::error title=Sensitive data in Gateway logs::A security canary appeared in container logs."
+            exit 1
+          fi
+        working-directory: product/deploy
+      - name: Run NFR performance suite
+        env:
+          DIAGRAM_GATEWAY_URL: http://localhost:19000
+          DIAGRAM_API_KEY: ci-secret
+          PERF_WORKSPACE_COUNT: 100
+          PERF_WORKSPACE_CONCURRENCY: 4
+          QUALITY_REPORT_PATH: test-results/performance.json
+        run: timeout --signal=TERM --kill-after=1m 8m npm run test:performance
+        working-directory: product
+      - name: Capture resource baseline
+        run: docker stats --no-stream --format '{{json .}}' > ../test-results/container-stats-before.jsonl
+        working-directory: product/deploy
+      - name: Run bounded concurrency soak
+        env:
+          DIAGRAM_GATEWAY_URL: http://localhost:19000
+          DIAGRAM_API_KEY: ci-secret
+          SOAK_DURATION_SECONDS: 60
+          SOAK_CONCURRENCY: 12
+          SOAK_MAX_ACTIVE: 4
+          SOAK_MAX_QUEUE: 20
+          QUALITY_REPORT_PATH: test-results/soak.json
+        run: timeout --signal=TERM --kill-after=1m 5m npm run test:soak
+        working-directory: product
+      - name: Capture resource state after soak
+        run: docker stats --no-stream --format '{{json .}}' > ../test-results/container-stats-after.jsonl
+        working-directory: product/deploy
+      - name: Capture deterministic renderer baseline without Gateway cache
+        run: timeout --signal=TERM --kill-after=1m 8m docker compose -p diagram-product-ci --env-file .env.example exec -T -e KROKI_DIRECT_URL=http://kroki:8000 -e DETERMINISM_REPORT=/tmp/determinism-before.json gateway node scripts/determinism-test.mjs
         working-directory: product/deploy
       - name: Stop Mermaid companion for isolation test
         run: docker compose -p diagram-product-ci --env-file .env.example stop mermaid
         working-directory: product/deploy
-      - name: Verify companion failure isolation
+      - name: Verify companion failure isolation and degraded readiness
         env:
           DIAGRAM_GATEWAY_URL: http://localhost:19000
           DIAGRAM_API_KEY: ci-secret
-        run: timeout --signal=TERM --kill-after=1m 5m npm run test:isolation
+          RECOVERY_EXPECT: degraded
+          QUALITY_REPORT_PATH: test-results/recovery-degraded.json
+        run: timeout --signal=TERM --kill-after=1m 5m npm run test:recovery
         working-directory: product
+      - name: Restart Mermaid companion
+        run: docker compose -p diagram-product-ci --env-file .env.example start mermaid
+        working-directory: product/deploy
+      - name: Verify automatic companion recovery
+        env:
+          DIAGRAM_GATEWAY_URL: http://localhost:19000
+          DIAGRAM_API_KEY: ci-secret
+          RECOVERY_EXPECT: ready
+          QUALITY_REPORT_PATH: test-results/recovery-ready.json
+        run: timeout --signal=TERM --kill-after=1m 5m npm run test:recovery
+        working-directory: product
+      - name: Restart rendering backends
+        run: docker compose -p diagram-product-ci --env-file .env.example restart kroki mermaid
+        working-directory: product/deploy
+      - name: Verify readiness after backend restart
+        env:
+          DIAGRAM_GATEWAY_URL: http://localhost:19000
+          DIAGRAM_API_KEY: ci-secret
+          RECOVERY_EXPECT: ready
+          QUALITY_REPORT_PATH: test-results/recovery-restart.json
+        run: timeout --signal=TERM --kill-after=1m 5m npm run test:recovery
+        working-directory: product
+      - name: Compare deterministic output after restart
+        run: timeout --signal=TERM --kill-after=1m 8m docker compose -p diagram-product-ci --env-file .env.example exec -T -e KROKI_DIRECT_URL=http://kroki:8000 -e DETERMINISM_BASELINE=/tmp/determinism-before.json -e DETERMINISM_REPORT=/tmp/determinism-after.json gateway node scripts/determinism-test.mjs
+        working-directory: product/deploy
+      - name: Collect reliability reports
+        if: always()
+        run: |
+          mkdir -p ../test-results
+          docker compose -p diagram-product-ci --env-file .env.example cp gateway:/tmp/determinism-before.json ../test-results/determinism-before.json || true
+          docker compose -p diagram-product-ci --env-file .env.example cp gateway:/tmp/determinism-after.json ../test-results/determinism-after.json || true
+        working-directory: product/deploy
+      - name: Upload reliability reports
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: product-reliability-reports
+          path: product/test-results/
+          if-no-files-found: warn
       - name: Show container logs
         if: failure()
         run: docker compose -p diagram-product-ci --env-file .env.example logs --no-color --tail=300

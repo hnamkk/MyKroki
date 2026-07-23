@@ -1,16 +1,6 @@
-name: Docs CI
+name: Upstream Deployment Docs CI
 
 on:
-  push:
-    paths:
-      - 'docs/**'
-    branches:
-      - main
-  pull_request:
-    paths:
-      - 'docs/**'
-    branches:
-      - '*'
   workflow_dispatch:
 
 jobs:

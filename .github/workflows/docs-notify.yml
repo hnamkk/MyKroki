@@ -1,11 +1,7 @@
-name: Docs Notify
+name: Upstream Docs Notify
 
 on:
-  push:
-    paths:
-      - 'docs/**'
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   trigger_publish:

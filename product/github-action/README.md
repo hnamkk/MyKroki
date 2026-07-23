@@ -2,6 +2,20 @@
 
 Action gọi Diagram Gateway để kiểm tra hoặc sinh lại SVG/PNG từ source được khai báo trong `.diagram.yml`. Bundle `dist/index.cjs` đã chứa dependency nên repository sử dụng chỉ cần checkout source và gọi Action.
 
+## Thiết lập cá nhân với self-hosted runner
+
+Profile mặc định của MyKroki dành cho một maintainer hoặc private repository dùng runner Windows có label `diagram-renderer`, Gateway local tại `http://localhost:9000` và API key lưu trong Actions Secret.
+
+Repository cần:
+
+- Actions variable `DIAGRAM_GATEWAY_URL=http://localhost:9000`.
+- Actions secret `DIAGRAM_API_KEY` chứa plaintext key `dg_...`.
+- Runner có labels `self-hosted`, `Windows`, `X64`, `diagram-renderer`; chạy bằng `run.cmd` khi thử nghiệm hoặc Windows Service khi dùng lâu dài.
+
+Workflow `.github/workflows/diagram-check.yml` của MyKroki tự chạy khi pull request nội bộ nhắm vào `main`, sau khi merge/push vào `main`, hoặc khi maintainer chạy thủ công. PR dùng change detector; push/manual kiểm tra toàn bộ. Điều kiện job loại fork PR trong luồng bình thường, nhưng profile này chỉ dành cho private repository hoặc branch/collaborator đáng tin cậy. Với public repository, phải tắt fork workflows hoặc yêu cầu maintainer phê duyệt mọi outside collaborator trong Actions Settings; không phê duyệt fork chạy trên persistent runner.
+
+Check chạy read-only với `contents: read`, upload preview và fail khi source lỗi hoặc output missing/stale/orphaned. Đặt `Diagram check / Verify generated diagrams` làm required check sau khi workflow đã chạy thành công ít nhất một lần.
+
 ## Thiết lập check cho pull request
 
 ```yaml
@@ -19,17 +33,17 @@ jobs:
   diagrams:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
-      - uses: hnamkk/MyKroki/product/github-action@main
+      - uses: hnamkk/MyKroki/product/github-action@product-v0.1.0
         with:
           gateway-url: ${{ vars.DIAGRAM_GATEWAY_URL }}
           auth-mode: oidc
           oidc-audience: diagram-gateway
 ```
 
-`fetch-depth: 0` cho phép Action so sánh với base commit của pull request. `id-token: write` chỉ cho phép job xin JWT từ GitHub, không cấp quyền ghi repository. `oidc-audience` phải trùng `GITHUB_OIDC_AUDIENCE` của Gateway; Gateway phải allowlist immutable repository ID và workflow ref. Nếu Gateway chạy trong mạng riêng, dùng self-hosted runner có thể kết nối tới Gateway.
+Đây là profile hosted/team dùng OIDC. `fetch-depth: 0` cho phép Action so sánh với base commit của pull request. `id-token: write` chỉ cho phép job xin JWT từ GitHub, không cấp quyền ghi repository. `oidc-audience` phải trùng `GITHUB_OIDC_AUDIENCE` của Gateway; Gateway phải allowlist immutable repository ID và workflow ref. Nếu Gateway chạy trong mạng riêng, dùng self-hosted runner có thể kết nối tới Gateway.
 
 Action mặc định chạy `check`, chỉ có quyền repository `contents: read`, không ghi file, không commit và không post comment. OIDC bổ sung `id-token: write` chỉ để xin identity token. Action upload artifact `diagram-previews` chứa output render và `manifest.json`, đồng thời fail khi source lỗi hoặc generated output bị thiếu, stale hay orphaned.
 
@@ -49,15 +63,15 @@ jobs:
   generate:
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v6
-      - uses: hnamkk/MyKroki/product/github-action@main
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: hnamkk/MyKroki/product/github-action@product-v0.1.0
         with:
           gateway-url: ${{ vars.DIAGRAM_GATEWAY_URL }}
           auth-mode: oidc
           oidc-audience: diagram-gateway
           mode: generate
           changed-only: "false"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: generated-workspace
           path: docs/generated
@@ -94,7 +108,7 @@ Action trả `checked-count`, `stale-count` và `generated-count`. Lỗi Gateway
 Gateway cũ hoặc deployment chưa bật OIDC có thể dùng:
 
 ```yaml
-      - uses: hnamkk/MyKroki/product/github-action@main
+      - uses: hnamkk/MyKroki/product/github-action@product-v0.1.0
         with:
           gateway-url: ${{ vars.DIAGRAM_GATEWAY_URL }}
           auth-mode: api-key

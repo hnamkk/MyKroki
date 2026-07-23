@@ -1,4 +1,4 @@
-name: Mermaid CI
+name: Upstream Mermaid CI
 
 on:
   push:

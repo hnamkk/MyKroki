@@ -147,12 +147,33 @@ RUN SVGBOB_VERSION=`cat Cargo.toml | grep "svgbob_cli =" | sed -r 's/.*"([^"]+)"
 FROM ghcr.io/yuzutech/erd:v0.2.3 AS erd
 
 ## GoAT
-FROM --platform=$BUILDPLATFORM golang:1.26.4-alpine AS kroki-builder-goat
+FROM --platform=$BUILDPLATFORM golang:1.26.5-alpine AS kroki-builder-goat
 
 ARG GOAT_VERSION=0.5.1
 
 RUN apk add git
 RUN go install "github.com/blampe/goat/cmd/goat@v${GOAT_VERSION}"
+
+## D2
+FROM --platform=$BUILDPLATFORM golang:1.26.5-alpine AS kroki-builder-d2
+
+ARG D2_VERSION="0.7.1"
+ARG D2_COMMIT="25ad4cdb8fe0e7abad9a0e710bbdb840b2c826b7"
+ARG TARGETARCH
+
+RUN apk add --no-cache git
+RUN git clone https://github.com/terrastruct/d2.git /src/d2 && \
+    cd /src/d2 && \
+    git checkout --detach "${D2_COMMIT}" && \
+    test "$(git describe --tags --exact-match)" = "v${D2_VERSION}"
+WORKDIR /src/d2
+RUN go get github.com/go-jose/go-jose/v3@v3.0.5 \
+    golang.org/x/image@v0.43.0 \
+    golang.org/x/net@v0.55.0 && \
+    go mod tidy && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -trimpath \
+      -ldflags "-X oss.terrastruct.com/d2/lib/version.Version=v${D2_VERSION}" \
+      -o /out/d2 .
 
 ## yuzutech/kroki
 FROM eclipse-temurin:25-jre-noble
@@ -223,9 +244,7 @@ RUN wget "https://github.com/yuzutech/graphviz-builder/releases/download/${GRAPH
 RUN wget "https://github.com/yuzutech/ditaa-mini/releases/download/${DITAA_VERSION}/ditaamini-linux-${TARGETARCH}-${DITAA_VERSION}" -O /usr/bin/ditaa && \
     chmod +x /usr/bin/ditaa
 
-RUN wget "https://github.com/terrastruct/d2/releases/download/v${D2_VERSION}/d2-v${D2_VERSION}-linux-${TARGETARCH}.tar.gz" -O - | tar -zxv -C /usr/bin d2-v${D2_VERSION}/bin/d2 && \
-    mv usr/bin/d2-v${D2_VERSION}/bin/d2 /usr/bin/d2 && \
-    chmod +x /usr/bin/d2
+COPY --from=kroki-builder-d2 /out/d2 /usr/bin/d2
 
 RUN wget "https://github.com/plantuml/plantuml/releases/download/v${PLANTUML_VERSION}/native-plantuml-linux-${TARGETARCH}-${PLANTUML_VERSION}.zip" -O plantuml-bin.zip && \
     unzip plantuml-bin.zip -d plantuml && \
@@ -252,6 +271,12 @@ COPY --from=kroki-builder-vega /app/app.bin /usr/bin/vega
 COPY --from=kroki-builder-wavedrom /app/build/app.bin /usr/bin/wavedrom
 COPY --from=tikz tikz2svg /usr/bin/tikz2svg
 COPY --from=kroki-builder-goat /go/bin/goat /usr/bin/goat
+
+# Header/compiler packages are pulled transitively by image assembly only.
+# Remove them from the runtime after all native artifacts have been installed.
+RUN apt-get purge --yes linux-libc-dev && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 COPY --chown=kroki:kroki ops/docker/logback.xml /etc/kroki/logback.xml
 

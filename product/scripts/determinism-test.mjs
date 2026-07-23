@@ -1,9 +1,12 @@
+import { createHash } from "node:crypto";
+import { readFile, writeFile } from "node:fs/promises";
 import process from "node:process";
 
 import { fetchWithTimeout } from "./http-timeout.mjs";
 
 const directUrl = process.env.KROKI_DIRECT_URL?.replace(/\/$/, "");
 if (!directUrl) throw new Error("Set KROKI_DIRECT_URL to the internal Kroki URL");
+const hashes = {};
 
 const examples = [
   ["mermaid", "flowchart LR\n  A --> B", { "deterministic-ids": true, "deterministic-id-seed": "contract-test" }],
@@ -29,6 +32,7 @@ for (const [type, source, options] of examples) {
     outputs.push(body);
   }
   if (outputs[0] !== outputs[1]) throw new Error(`${type} produced different SVG for identical source`);
+  hashes[type] = createHash("sha256").update(outputs[0]).digest("hex");
   process.stdout.write(`deterministic ${type}\n`);
 }
 
@@ -45,3 +49,19 @@ for (const [type, source] of [graphviz, dot]) {
 }
 if (aliasOutputs[0] !== aliasOutputs[1]) throw new Error("dot alias output differs from graphviz");
 process.stdout.write("deterministic graphviz/dot alias\n");
+
+const report = {
+  generatedAt: new Date().toISOString(),
+  rendererUrl: directUrl,
+  hashes,
+};
+if (process.env.DETERMINISM_BASELINE) {
+  const baseline = JSON.parse(await readFile(process.env.DETERMINISM_BASELINE, "utf8"));
+  if (JSON.stringify(baseline.hashes) !== JSON.stringify(hashes)) {
+    throw new Error(`Renderer output changed across restart: ${JSON.stringify({ before: baseline.hashes, after: hashes })}`);
+  }
+  process.stdout.write("deterministic output matches restart baseline\n");
+}
+if (process.env.DETERMINISM_REPORT) {
+  await writeFile(process.env.DETERMINISM_REPORT, `${JSON.stringify(report, null, 2)}\n`, "utf8");
+}

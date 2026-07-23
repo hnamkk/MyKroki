@@ -30,7 +30,11 @@ COPY --chown=kroki:kroki assets ./assets
 # ("lib" named build context, see docker-bake.hcl)
 COPY --from=lib --chown=kroki:kroki . /usr/local/lib/browser-instance
 
-RUN npm i --omit=dev
+RUN npm ci --omit=dev
+
+USER root
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+USER kroki
 
 EXPOSE 8002
 

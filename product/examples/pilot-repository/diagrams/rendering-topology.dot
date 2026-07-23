@@ -1,0 +1,8 @@
+digraph RenderingTopology {
+  rankdir=LR;
+  Gateway -> Kroki;
+  Kroki -> Mermaid;
+  Kroki -> PlantUML;
+  Kroki -> Graphviz;
+  Kroki -> D2;
+}

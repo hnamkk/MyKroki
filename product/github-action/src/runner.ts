@@ -72,6 +72,12 @@ function sha256(content: Buffer): string {
   return createHash("sha256").update(content).digest("hex");
 }
 
+function generatedOutputEquals(outputPath: string, committed: Buffer, rendered: Buffer): boolean {
+  if (!outputPath.toLowerCase().endsWith(".svg")) return committed.equals(rendered);
+  const normalizeLineEndings = (content: Buffer) => content.toString("utf8").replaceAll("\r\n", "\n");
+  return normalizeLineEndings(committed) === normalizeLineEndings(rendered);
+}
+
 function mergePlan(base: VerificationItem[], additions: VerificationItem[]): VerificationItem[] {
   const byOutput = new Map<string, VerificationItem>();
   for (const item of [...base, ...additions]) byOutput.set(item.outputPath, item);
@@ -110,7 +116,7 @@ export async function runAction(options: RunActionOptions, dependencies: RunDepe
       const digest = sha256(output);
       const status = !existsSync(absoluteOutput)
         ? "missing"
-        : readFileSync(absoluteOutput).equals(output)
+        : generatedOutputEquals(item.outputPath, readFileSync(absoluteOutput), output)
           ? "current"
           : "stale";
       outcomes.push({ sourcePath: item.sourcePath, outputPath: item.outputPath, status, sha256: digest });

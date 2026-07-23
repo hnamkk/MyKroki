@@ -14,7 +14,7 @@
 ---
 
 ifdef::env-github[]
-image:https://github.com/yuzutech/kroki/workflows/CI/badge.svg?branch=master[GitHub Actions build status, link=https://github.com/yuzutech/kroki/actions]
+image:https://github.com/hnamkk/MyKroki/actions/workflows/product-ci.yml/badge.svg?branch=main[Product CI status, link=https://github.com/hnamkk/MyKroki/actions/workflows/product-ci.yml]
 image:https://img.shields.io/badge/zulip-join_chat-brightgreen.svg[Zulip chat, link=https://kroki.zulipchat.com/]
 endif::[]
 
@@ -35,6 +35,13 @@ and trusted-event generation without committing automatically; see
 link:product/github-action/README.md[the setup and fork-security guide].
 The link:product/vscode-extension/README.md[VS Code extension] provides live preview,
 Problems diagnostics, SVG/PNG export, optional render-on-save, and Gateway connection checks.
+The complete local, VS Code, GitHub Action, pilot, release, and rollback procedure is in
+link:docs/E2E_SETUP_GUIDE.md[the E2E setup and acceptance guide].
+The default personal CI profile uses a trusted Windows self-hosted runner and local Gateway
+for automatic internal pull-request checks and post-merge checks on `main`. Heavy upstream
+Kroki and deployment-documentation workflows are scoped to owned paths or manual/nightly execution.
+Pull requests use quick quality/Java/Extension checks; full Product Compose, container security,
+performance, recovery, and upstream image smoke run on `main`, manual candidates, or nightly.
 
 Install and verify the product workspace independently:
 
@@ -46,6 +53,19 @@ Install and verify the product workspace independently:
 With the product Compose stack running and `DIAGRAM_API_KEY` configured, run the renderer acceptance gate:
 
  $ npm run test:renderers --prefix product
+
+Phase 6 reliability gates can be run against the same reference stack:
+
+ $ npm run test:security --prefix product
+ $ npm run test:performance --prefix product
+ $ npm run test:soak --prefix product
+ $ npm run test:recovery --prefix product
+ $ npm run test:container-policy --prefix product
+
+The Compose deployment runs Gateway, Kroki, and Mermaid as non-root containers with
+read-only root filesystems, dropped capabilities, CPU/memory/PID limits, and restart
+policies. Tune the `*_CPU_LIMIT`, `*_MEMORY_LIMIT`, and `*_PIDS_LIMIT` variables in
+`product/deploy/.env.example` for the target host.
 
 == Usage
 
@@ -143,9 +163,13 @@ Install `task` command-line: https://taskfile.dev/installation/
 
 === Gateway Server
 
-The first step is to build the project using Maven:
+Building the Kroki fork requires JDK 25. The first step is to build the project using Maven:
 
  $ task mavenBuild
+
+On Windows, the repository wrapper can be used directly:
+
+ $ mvnw.cmd --no-transfer-progress test
 
 === Docker Images
 

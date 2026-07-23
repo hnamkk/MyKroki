@@ -20,13 +20,24 @@ Developer sửa file trong `docs/diagrams`, mở preview và dùng `Diagram: Exp
 5. Copy `product/.diagram.example.yml` thành `.diagram.yml` ở repo sử dụng.
 6. Build/cài VSIX từ `product/vscode-extension/dist/diagram-as-code-vscode.vsix`.
 7. Cấu hình `diagramAsCode.gatewayUrl`, lưu key bằng `Diagram: Set Gateway API Key`, rồi chạy `Diagram: Check Gateway Connection`.
-8. Thiết lập workflow theo [GitHub Action README](github-action/README.md); hosted Gateway ưu tiên GitHub OIDC, API key là fallback.
+8. Với profile cá nhân, đăng ký self-hosted runner `diagram-renderer`, đặt Gateway URL/API key bằng Actions Variable/Secret và dùng workflow tự động trên PR nội bộ + push `main`; profile hosted/team tiếp tục ưu tiên OIDC.
 
-`npm run test:isolation` dành cho fault injection: dừng riêng Mermaid companion trước khi chạy và khởi động lại sau khi kiểm tra.
+Kịch bản setup và nghiệm thu từ đầu đến cuối nằm trong [E2E Setup Guide](../docs/E2E_SETUP_GUIDE.md). Fixture bốn engine dùng cho pilot nằm tại `product/examples/pilot-repository`.
+
+Các quality gate Phase 6 chạy trên cùng stack:
+
+```powershell
+npm run test:security
+npm run test:performance
+npm run test:soak
+npm run test:container-policy
+```
+
+`npm run test:recovery` dành cho fault injection. Dừng riêng Mermaid, đặt `RECOVERY_EXPECT=degraded` để kiểm tra isolation, sau đó start/restart dependency và chạy lại với `RECOVERY_EXPECT=ready`. Các suite ghi report JSON khi đặt `QUALITY_REPORT_PATH`.
 
 Extension Host E2E được chạy bằng `npm --workspace=diagram-as-code-vscode run test:e2e`; đặt `VSCODE_TEST_VERSION=1.100.0` để kiểm tra version tối thiểu.
 
-Các quy trình TLS, key rotation, update và rollback nằm trong [Infrastructure and Operations](docs/infrastructure-operations.md). Quy trình đóng gói, phát hành và rollback version nằm trong [Release Guide](docs/release-guide.md).
+Các quy trình TLS, key rotation, update và rollback nằm trong [Infrastructure and Operations](docs/infrastructure-operations.md). Quy trình đóng gói, phát hành và rollback version nằm trong [Release Guide](docs/release-guide.md); quyết định phát hành dùng [MVP Go/No-Go Checklist](docs/go-no-go-checklist.md).
 
 ## Phạm vi MVP
 

@@ -480,12 +480,14 @@ Export và render-on-save tính path bằng shared planner, kiểm tra cả path
 | `AuthProvider` | `auto` ưu tiên OIDC khi có audience và fallback API key có cảnh báo; `oidc`, `api-key`, `none` là các mode explicit. PAT không được dùng. |
 | `GatewayClient` | Gọi cùng render API với VS Code. |
 | `OutputPlanner` | Tính deterministic output path. |
-| `CheckRunner` | Render, so sánh byte/hash và phát hiện stale output. |
+| `CheckRunner` | Render, so sánh output và phát hiện stale; SVG chuẩn hóa LF/CRLF để checkout Windows không tạo false positive, PNG giữ so sánh byte tuyệt đối. |
 | `AnnotationReporter` | Ghi lỗi file/line và job summary. |
 | `ArtifactPublisher` | Upload output mới khi check lỗi hoặc theo cấu hình. |
 | `GenerateRunner` | Render all-or-nothing, ghi output atomically trên trusted event và không tự commit. |
 
 Action được viết bằng TypeScript và bundle thành `dist/index.cjs` để người dùng không phải cài dependency. `check` là mode mặc định, staging artifact ngoài workspace và không có write path. OIDC cần `contents: read` cùng `id-token: write`; quyền này chỉ cho phép xin JWT, không cấp quyền ghi repository. Action gọi `getIDToken(oidcAudience)`, mask token và dùng nó làm Bearer credential trực tiếp. `generate` bị từ chối trên mọi `pull_request` event; chỉ ghi sau khi tất cả render thành công và rollback khi transaction file lỗi. API key và local no-auth vẫn được hỗ trợ; adapter commit là tính năng sau MVP.
+
+Profile cá nhân mặc định chạy Action trên persistent self-hosted runner Windows có label `diagram-renderer`, gọi Gateway local/private bằng API key và chỉ dành cho push `main`, manual dispatch hoặc PR nội bộ từ collaborator đáng tin cậy. Workflow loại head repository khác repository đích, đồng thời operator phải tắt/giữ approval bắt buộc cho fork workflows; job condition không thay thế repository security policy. Profile hosted/team/public-fork thay runner bằng GitHub-hosted hoặc ephemeral runner và dùng OIDC; contract render và `.diagram.yml` không đổi.
 
 ### 3.6 Shared configuration package
 
@@ -1076,8 +1078,15 @@ Manifest là `Should`; MVP vẫn có thể render lại và so output hash trự
 | `METRICS_ENABLED` | `true` | Có đăng ký `/metrics` hay không |
 | `LOG_LEVEL` | `info` | Mức Pino/Fastify log |
 | `KROKI_BASE_URL` | `http://kroki:8000` | Internal backend URL |
+| `GATEWAY_PIDS_LIMIT` / `GATEWAY_MEMORY_LIMIT` / `GATEWAY_CPU_LIMIT` | `256` / `512m` / `1.0` | Resource confinement cho Gateway container |
+| `KROKI_PIDS_LIMIT` / `KROKI_MEMORY_LIMIT` / `KROKI_CPU_LIMIT` | `256` / `1g` / `2.0` | Resource confinement cho Kroki JVM và local renderers |
+| `MERMAID_PIDS_LIMIT` / `MERMAID_MEMORY_LIMIT` / `MERMAID_CPU_LIMIT` | `256` / `1g` / `1.0` | Resource confinement cho Chromium companion |
 
 Production profile phải fail fast nếu bật no-auth trên non-loopback interface, nếu thiếu OIDC audience khi bật OIDC, hoặc nếu cấu hình backend URL dùng public/untrusted scheme không được allowlist.
+
+Reference Compose chạy cả ba container bằng non-root user, read-only root filesystem, tmpfs giới hạn cho dữ liệu tạm, `cap_drop: ALL`, `no-new-privileges`, PID/memory/CPU limits và restart policy. Chỉ Gateway publish port; Kroki và Mermaid ở private rendering network.
+
+Tagged product release publish Gateway, Kroki fork và Mermaid companion dưới cùng `product-vX.Y.Z`. Release manifest khóa `.diagram.yml` schema version, renderer versions, image tag và immutable digest; release Compose bắt buộc nhận đủ ba image reference và không fallback về image upstream. Bundle phát hành kèm VSIX, Action bundle, Compose/env example, npm/container SPDX SBOM, release notes và `SHA256SUMS`.
 
 ## 9. Kiểm thử kiến trúc tối thiểu
 
@@ -1093,6 +1102,11 @@ Kế hoạch kiểm thử chi tiết, môi trường tham chiếu và danh sách
 | VS Code E2E | Unsaved preview, stale response, diagnostic, export và SecretStorage. |
 | GitHub Action E2E | Check pass/fail, stale output, artifact, API key và OIDC policy. |
 | Deployment smoke | Docker Compose, health/readiness và chỉ Gateway được expose. |
+| Reliability | Performance/workspace benchmark, concurrency soak, dependency kill/restart, deterministic hash qua restart và flaky-test repetition có deadline. |
+| Supply chain | SBOM cho npm và ba image runtime; Trivy chặn mọi High/Critical trên image build từ commit; runtime image loại compiler/header packages sau assembly; GitHub Actions bên thứ ba pin commit SHA. |
+| Release/pilot | Pilot fixture bốn engine, manifest/checksum verification, tagged image consistency, setup dưới 30 phút và upgrade/rollback rehearsal. |
+
+CI dùng hai mức chi phí. Pull request chạy quick gates: Product quality/contract, Java fork regression, VS Code Extension Host và Diagram check; Upstream Kroki PR chỉ build/test Java. Product Compose acceptance và Upstream container build/smoke bị skip trên event PR, nhưng chạy đầy đủ sau push `main`, manual dispatch trên candidate branch hoặc nightly reusable workflow. Release evidence chỉ chấp nhận full run, không dùng kết quả quick PR thay thế.
 
 ## 10. Điểm cần xác nhận trước implementation
 

@@ -81,6 +81,48 @@ test("check mode is read-only and publishes safe preview metadata", async (conte
   assert.doesNotMatch(JSON.stringify(deps.published[0]?.manifest), /masked-key/);
 });
 
+test("check mode ignores checkout line-ending conversion for SVG", async (context) => {
+  const root = fixture(context);
+  writeFileSync(path.join(root, "docs", "generated", "a.svg"), "<svg>\r\n  <path />\r\n</svg>\r\n");
+  const deps = dependencies(async () => Buffer.from("<svg>\n  <path />\n</svg>\n"));
+  const result = await runAction({
+    root,
+    config,
+    inputs,
+    allSources: ["docs/diagrams/a.mmd"],
+    generatedFiles: ["docs/generated/a.svg"],
+    changes: [],
+    forceAll: true,
+  }, deps.value);
+  assert.equal(result.failed, false);
+  assert.equal(result.staleCount, 0);
+  assert.equal(result.outcomes[0]?.status, "current");
+});
+
+test("check mode keeps binary output comparison byte-exact", async (context) => {
+  const root = fixture(context);
+  const pngConfig = parseDiagramConfig(`
+version: 1
+sources: [docs/diagrams/**/*.mmd]
+output: docs/generated
+defaults: { format: png, theme: default }
+`);
+  writeFileSync(path.join(root, "docs", "generated", "a.png"), Buffer.from([0x0d, 0x0a]));
+  const deps = dependencies(async () => Buffer.from([0x0a]));
+  const result = await runAction({
+    root,
+    config: pngConfig,
+    inputs,
+    allSources: ["docs/diagrams/a.mmd"],
+    generatedFiles: ["docs/generated/a.png"],
+    changes: [],
+    forceAll: true,
+  }, deps.value);
+  assert.equal(result.failed, true);
+  assert.equal(result.staleCount, 1);
+  assert.equal(result.outcomes[0]?.status, "stale");
+});
+
 test("generate mode writes all outputs only after every render succeeds", async (context) => {
   const root = fixture(context);
   writeFileSync(path.join(root, "docs", "diagrams", "b.mmd"), "flowchart LR\nB-->C\n");
