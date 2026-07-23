@@ -2,7 +2,7 @@
 
 Lớp sản phẩm này bổ sung workflow hoàn chỉnh quanh fork Kroki mà không trộn code tùy biến vào module upstream:
 
-- `gateway`: Fastify API có scoped API-key principals, rate limit, bounded render queue, output validation/SVG sanitization, LRU/single-flight cache và Prometheus metrics.
+- `gateway`: Fastify API có scoped API-key principals, rate limit, bounded render queue, output validation/SVG sanitization, weighted TTL LRU/single-flight cache và Prometheus metrics.
 - `vscode-extension`: live preview và export SVG thủ công, ổn định.
 - `github-action`: kiểm tra SVG đã commit có khớp source trên pull request.
 - `deploy`: Compose self-hosted, chỉ expose Gateway.
@@ -16,8 +16,11 @@ Developer sửa file trong `docs/diagrams`, mở preview và dùng `Diagram: Exp
 1. Làm theo [Environment Bootstrap](docs/environment-bootstrap.md).
 2. Tạo `product/deploy/.env`, rồi chạy `docker compose up -d --build` trong `product/deploy`.
 3. Chạy `npm run smoke` trong `product` với `DIAGRAM_API_KEY` đã đặt.
-4. Copy `product/.diagram.example.yml` thành `.diagram.yml` ở repo sử dụng.
-5. Build/cài VSIX từ `product/vscode-extension/dist/diagram-as-code-vscode.vsix`.
+4. Chạy `npm run test:renderers` để kiểm tra SVG/PNG, alias, error contract và secure includes trên stack đang chạy.
+5. Copy `product/.diagram.example.yml` thành `.diagram.yml` ở repo sử dụng.
+6. Build/cài VSIX từ `product/vscode-extension/dist/diagram-as-code-vscode.vsix`.
+
+`npm run test:isolation` dành cho fault injection: dừng riêng Mermaid companion trước khi chạy và khởi động lại sau khi kiểm tra.
 
 Các quy trình TLS, key rotation, update và rollback nằm trong [Infrastructure and Operations](docs/infrastructure-operations.md). Quy trình đóng gói, phát hành và rollback version nằm trong [Release Guide](docs/release-guide.md).
 

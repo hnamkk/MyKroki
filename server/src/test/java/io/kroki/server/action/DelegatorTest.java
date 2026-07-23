@@ -8,6 +8,7 @@ import io.vertx.core.http.HttpServer;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.web.Router;
 import io.vertx.ext.web.client.HttpResponse;
+import io.vertx.ext.web.client.WebClient;
 import io.vertx.junit5.VertxExtension;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +21,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 @ExtendWith(VertxExtension.class)
 public class DelegatorTest {
@@ -79,5 +81,40 @@ public class DelegatorTest {
     HashMap<String, Object> options = new HashMap<>();
     HttpResponse<Buffer> response = delegator.delegate("localhost", port, "/redirect", "", new JsonObject(options)).await(5, TimeUnit.SECONDS);
     assertThat(response.bodyAsString()).isEqualTo(HttpMethod.POST.name());
+  }
+
+  @Test
+  void should_not_propagate_companion_stack_trace(Vertx vertx) throws TimeoutException {
+    HttpServer server = vertx.createHttpServer();
+    server.requestHandler(req -> req.response()
+      .setStatusCode(400)
+      .putHeader(HttpHeaders.CONTENT_TYPE, "application/json")
+      .end(new JsonObject().put("error", new JsonObject()
+        .put("name", "SyntaxError")
+        .put("message", "Unexpected token at line 3")
+        .put("stacktrace", "SECRET_INTERNAL_STACK")).encode()));
+    server.listen(port, "localhost").await(5, TimeUnit.SECONDS);
+
+    WebClient client = WebClient.create(vertx);
+    HttpResponse<Buffer> response = client.post(port, "localhost", "/render")
+      .sendBuffer(Buffer.buffer("broken"))
+      .await(5, TimeUnit.SECONDS);
+    assertThatThrownBy(() -> Delegator.handle("localhost", port, "/render", io.vertx.core.Future.succeededFuture(response))
+      .await(5, TimeUnit.SECONDS))
+      .hasMessageContaining("SyntaxError: Unexpected token at line 3")
+      .hasMessageNotContaining("SECRET_INTERNAL_STACK");
+  }
+
+  @Test
+  void should_cancel_a_wedged_companion_request_at_configured_timeout(Vertx vertx) throws TimeoutException {
+    HttpServer server = vertx.createHttpServer();
+    server.requestHandler(req -> req.body().onSuccess(ignored -> { }));
+    server.listen(port, "localhost").await(5, TimeUnit.SECONDS);
+    Delegator delegator = new Delegator(vertx, new JsonObject().put("KROKI_DELEGATE_TIMEOUT_MS", 100L));
+    long startedAt = System.nanoTime();
+    assertThatThrownBy(() -> delegator.delegate("localhost", port, "/render", "source", new JsonObject())
+      .await(10, TimeUnit.SECONDS))
+      .isInstanceOf(Exception.class);
+    assertThat(TimeUnit.NANOSECONDS.toSeconds(System.nanoTime() - startedAt)).isLessThan(5);
   }
 }

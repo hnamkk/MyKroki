@@ -19,6 +19,7 @@ export class GatewayMetrics {
   private readonly durations = new Map<string, { count: number; seconds: number }>();
   private readonly cache = new Map<string, number>();
   private readonly errors = new Map<string, number>();
+  private readonly cacheErrors = new Map<string, number>();
 
   record(event: RenderMetricEvent): void {
     const dimensions = labels({ engine: event.engine || "unknown", format: event.format || "unknown", status: String(event.statusCode) });
@@ -29,6 +30,10 @@ export class GatewayMetrics {
     this.durations.set(dimensions, duration);
     if (event.cache) this.cache.set(event.cache, (this.cache.get(event.cache) ?? 0) + 1);
     if (event.errorCode) this.errors.set(event.errorCode, (this.errors.get(event.errorCode) ?? 0) + 1);
+  }
+
+  recordCacheError(operation: "read" | "write"): void {
+    this.cacheErrors.set(operation, (this.cacheErrors.get(operation) ?? 0) + 1);
   }
 
   render(active: number, queued: number): string {
@@ -51,6 +56,10 @@ export class GatewayMetrics {
     for (const [result, count] of [...this.cache].sort()) lines.push(`diagram_gateway_cache_results_total{result="${result}"} ${count}`);
     lines.push("# HELP diagram_gateway_render_errors_total Normalized render errors.", "# TYPE diagram_gateway_render_errors_total counter");
     for (const [code, count] of [...this.errors].sort()) lines.push(`diagram_gateway_render_errors_total{code="${code}"} ${count}`);
+    lines.push("# HELP diagram_gateway_cache_errors_total Cache adapter operations that failed.", "# TYPE diagram_gateway_cache_errors_total counter");
+    for (const [operation, count] of [...this.cacheErrors].sort()) {
+      lines.push(`diagram_gateway_cache_errors_total{operation="${operation}"} ${count}`);
+    }
     lines.push(
       "# HELP diagram_gateway_render_active Active backend renders.",
       "# TYPE diagram_gateway_render_active gauge",

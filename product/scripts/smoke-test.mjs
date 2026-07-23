@@ -1,6 +1,8 @@
 import process from "node:process";
 import { deflateRawSync } from "node:zlib";
 
+import { fetchWithTimeout } from "./http-timeout.mjs";
+
 const baseUrl = (process.env.DIAGRAM_GATEWAY_URL ?? "http://localhost:9000").replace(/\/$/, "");
 const apiKey = process.env.DIAGRAM_API_KEY;
 if (!apiKey) throw new Error("Set DIAGRAM_API_KEY to the key configured for the Gateway");
@@ -17,7 +19,7 @@ async function waitUntilReady() {
   const deadline = Date.now() + 120_000;
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(`${baseUrl}/health/ready`);
+      const response = await fetchWithTimeout(`${baseUrl}/health/ready`, {}, 5_000);
       if (response.ok) return;
     } catch {
       // The stack may still be starting.
@@ -37,11 +39,11 @@ function assertSvg(response, body, label) {
 }
 
 await waitUntilReady();
-const engines = await fetch(`${baseUrl}/api/v1/engines`);
+const engines = await fetchWithTimeout(`${baseUrl}/api/v1/engines`);
 if (!engines.ok || (await engines.json()).engines.length < 4) throw new Error("Engine discovery failed");
 
 for (const [engine, source] of examples) {
-  const response = await fetch(`${baseUrl}/api/v1/render`, {
+  const response = await fetchWithTimeout(`${baseUrl}/api/v1/render`, {
     method: "POST",
     headers: { authorization, "content-type": "application/json" },
     body: JSON.stringify({ engine, format: "svg", source }),
@@ -51,7 +53,7 @@ for (const [engine, source] of examples) {
   process.stdout.write(`ok JSON ${engine} (${response.headers.get("x-cache")})\n`);
 }
 
-const textResponse = await fetch(`${baseUrl}/api/v1/render/mermaid/svg`, {
+const textResponse = await fetchWithTimeout(`${baseUrl}/api/v1/render/mermaid/svg`, {
   method: "POST",
   headers: { authorization, "content-type": "text/plain" },
   body: examples[0][1],
@@ -59,7 +61,7 @@ const textResponse = await fetch(`${baseUrl}/api/v1/render/mermaid/svg`, {
 assertSvg(textResponse, await textResponse.text(), "text/plain Mermaid");
 
 const encoded = deflateRawSync(Buffer.from(examples[2][1], "utf8")).toString("base64url");
-const getResponse = await fetch(`${baseUrl}/api/v1/render/dot/svg/${encoded}`, {
+const getResponse = await fetchWithTimeout(`${baseUrl}/api/v1/render/dot/svg/${encoded}`, {
   headers: { authorization },
 });
 assertSvg(getResponse, await getResponse.text(), "encoded Graphviz");

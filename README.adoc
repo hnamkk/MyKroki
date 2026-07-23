@@ -38,6 +38,10 @@ Install and verify the product workspace independently:
  $ npm test --prefix product
  $ npm run build --prefix product
 
+With the product Compose stack running and `DIAGRAM_API_KEY` configured, run the renderer acceptance gate:
+
+ $ npm run test:renderers --prefix product
+
 == Usage
 
 Kroki uses a simple algorithm (deflate + base64) to encode your diagram in the URL:
@@ -143,6 +147,8 @@ The first step is to build the project using Maven:
 To build all the Docker images, use the following command:
 
  $ sudo task dockerBuildImages
+
+The default build targets the runner's native architecture and loads each image into Docker for immediate use. Nightly and release automation can opt into a multi-architecture export with `BUILD_MULTIARCH=true`; multi-architecture output cannot be loaded into the local Docker image store.
 
 NOTE: `sudo` might not be needed depending on your distribution and `docker` configuration.
 

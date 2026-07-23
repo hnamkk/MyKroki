@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { InvalidRenderOutput, RenderOutputTooLarge } from "../dist/output-validator.js";
-import { KrokiRenderer, RendererUnavailable, readResponseBody } from "../dist/renderer.js";
+import {
+  KrokiRenderer,
+  RendererFailure,
+  RendererUnavailable,
+  parseRendererFailure,
+  readResponseBody,
+} from "../dist/renderer.js";
 
 test("rejects renderer response from Content-Length before buffering", async () => {
   const response = new Response("small", { headers: { "content-length": "100" } });
@@ -52,4 +58,47 @@ test("maps a broken Kroki response stream to renderer unavailable", async (conte
     renderer.render({ engine: "mermaid", format: "svg", source: "flowchart LR; A-->B" }),
     RendererUnavailable,
   );
+});
+
+test("normalizes JSON renderer errors and extracts source location", () => {
+  const failure = parseRendererFailure(Buffer.from(JSON.stringify({
+    error: { message: "syntax error in line 12, column 8\n    at /srv/kroki/worker.js:4:2" },
+  })), "application/json");
+  assert.ok(failure instanceof RendererFailure);
+  assert.equal(failure.message, "syntax error in line 12, column 8");
+  assert.equal(failure.line, 12);
+  assert.equal(failure.column, 8);
+  assert.doesNotMatch(failure.message, /\/srv\/|worker\.js|\bat\s/);
+});
+
+test("discovers independent engine versions and availability with a bounded cache", async (context) => {
+  let healthCalls = 0;
+  let mermaidAvailable = false;
+  let now = 1_000;
+  context.mock.method(globalThis, "fetch", async (input: string | URL | Request) => {
+    const url = String(input);
+    if (url.endsWith("/health")) {
+      healthCalls += 1;
+      return Response.json({ version: {
+        mermaid: "11.15.0", plantuml: "1.2026.6", c4plantuml: "1.2026.6",
+        graphviz: "14.1.3", dot: "14.1.3", d2: "0.7.1",
+      } });
+    }
+    if (url.includes("/mermaid/svg") && !mermaidAvailable) {
+      return Response.json({ error: { message: "offline" } }, { status: 503 });
+    }
+    return new Response("<svg/>", { status: 200, headers: { "content-type": "image/svg+xml" } });
+  });
+  const renderer = new KrokiRenderer("http://kroki", 1_000, 10_000, "fallback", 10, () => now);
+  const [first, concurrent] = await Promise.all([renderer.capabilities(), renderer.capabilities()]);
+  assert.equal(first.find((engine) => engine.id === "mermaid")?.available, false);
+  assert.equal(concurrent.find((engine) => engine.id === "mermaid")?.available, false);
+  assert.equal(first.find((engine) => engine.id === "plantuml")?.available, true);
+  assert.equal(first.find((engine) => engine.id === "graphviz")?.version, "14.1.3");
+  assert.equal((await renderer.capabilities()).find((engine) => engine.id === "mermaid")?.available, false);
+  assert.equal(healthCalls, 1);
+  mermaidAvailable = true;
+  now += 10;
+  assert.equal((await renderer.capabilities()).find((engine) => engine.id === "mermaid")?.available, true);
+  assert.equal(healthCalls, 2);
 });

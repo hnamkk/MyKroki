@@ -26,6 +26,9 @@ const config: GatewayConfig = {
   renderMaxConcurrent: 4,
   renderMaxQueue: 10,
   cacheMaxEntries: 10,
+  cacheMaxBytes: 100_000,
+  cacheMaxItemBytes: 10_000,
+  cacheTtlMs: 60_000,
   rendererVersion: "kroki-0.31.1",
   gatewayVersion: "0.1.0",
   sanitizerVersion: "svg-sanitizer-1",
@@ -38,6 +41,12 @@ const config: GatewayConfig = {
 function renderer(overrides: Partial<RendererClient> = {}): RendererClient {
   return {
     render: async () => Buffer.from("<svg>ok</svg>"),
+    capabilities: async () => [
+      { id: "mermaid", aliases: [], version: "mermaid-1", formats: ["svg", "png"], available: true },
+      { id: "plantuml", aliases: ["c4plantuml"], version: "plantuml-1", formats: ["svg", "png"], available: true },
+      { id: "graphviz", aliases: ["dot"], version: "graphviz-1", formats: ["svg", "png"], available: true },
+      { id: "d2", aliases: [], version: "d2-1", formats: ["svg"], available: true },
+    ],
     ready: async () => true,
     ...overrides,
   };
@@ -117,6 +126,9 @@ test("rejects invalid engine, unsupported format, bad encoding, and oversized so
     payload: { engine: "d2", format: "svg", source: "x", options: { executable: "bad" } },
   });
   const badEncoded = await app.inject({ method: "GET", url: "/api/v1/render/d2/svg/not_deflate", headers: auth });
+  const uriTooLong = await app.inject({
+    method: "GET", url: `/api/v1/render/d2/svg/${"a".repeat(8_193)}`, headers: auth,
+  });
   const oversized = await app.inject({
     method: "POST", url: "/api/v1/render", headers: auth,
     payload: { engine: "d2", format: "svg", source: "123456789" },
@@ -125,6 +137,8 @@ test("rejects invalid engine, unsupported format, bad encoding, and oversized so
   assert.equal(unsupported.json().code, "UNSUPPORTED_FORMAT");
   assert.equal(unsupportedOption.json().code, "UNSUPPORTED_OPTION");
   assert.equal(badEncoded.json().code, "INVALID_ENCODED_SOURCE");
+  assert.equal(uriTooLong.statusCode, 414);
+  assert.equal(uriTooLong.json().code, "URI_TOO_LONG");
   assert.equal(oversized.statusCode, 413);
   assert.equal(calls, 0);
   await app.close();
@@ -190,15 +204,24 @@ test("normalizes renderer failures to documented problem responses", async () =>
   }
 });
 
-test("lists OpenAPI engines and reports renderer readiness", async () => {
-  const app = createGateway({ config, renderer: renderer({ ready: async () => false }) });
+test("lists per-engine capabilities and reports renderer readiness", async () => {
+  const app = createGateway({ config, renderer: renderer({ capabilities: async () => [
+    { id: "mermaid", aliases: [], version: "11.15.0", formats: ["svg", "png"], available: false, unavailableReason: "mermaid renderer is not ready" },
+    { id: "plantuml", aliases: ["c4plantuml"], version: "1.2026.6", formats: ["svg", "png"], available: true },
+    { id: "graphviz", aliases: ["dot"], version: "14.1.3", formats: ["svg", "png"], available: true },
+    { id: "d2", aliases: [], version: "0.7.1", formats: ["svg"], available: true },
+  ] }) });
   const engines = await app.inject({ method: "GET", url: "/api/v1/engines" });
   const readiness = await app.inject({ method: "GET", url: "/health/ready" });
   assert.equal(engines.statusCode, 200);
   assert.deepEqual(engines.json().engines.map((item: { id: string }) => item.id), ["mermaid", "plantuml", "graphviz", "d2"]);
   assert.equal(engines.json().engines[1].aliases[0], "c4plantuml");
+  assert.equal(engines.json().engines[0].version, "11.15.0");
+  assert.equal(engines.json().engines[0].available, false);
+  assert.equal(engines.json().engines[1].available, true);
   assert.equal(readiness.statusCode, 503);
   assert.equal(readiness.json().status, "down");
+  assert.equal(readiness.json().checks[0].name, "mermaid");
   await app.close();
 });
 

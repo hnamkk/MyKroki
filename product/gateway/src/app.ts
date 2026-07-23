@@ -197,19 +197,23 @@ export function createGateway({ config, renderer, eventSink }: CreateGatewayOpti
       redact: ["req.headers.authorization", "headers.authorization"],
     },
     bodyLimit: config.maxSourceBytes + 65_536,
+    routerOptions: { maxParamLength: 8_193 },
     requestIdHeader: "x-request-id",
     logController: new LogController({ disableRequestLogging: true }),
   });
+  const metrics = new GatewayMetrics();
   const renderService = new RenderService(renderer, {
     maxEntries: config.cacheMaxEntries,
-    rendererVersion: config.rendererVersion,
+    maxCacheBytes: config.cacheMaxBytes,
+    maxCacheItemBytes: config.cacheMaxItemBytes,
+    cacheTtlMs: config.cacheTtlMs,
     sanitizerVersion: config.sanitizerVersion,
     maxOutputBytes: config.maxOutputBytes,
     maxConcurrent: config.renderMaxConcurrent,
     maxQueue: config.renderMaxQueue,
+    onCacheError: (operation) => metrics.recordCacheError(operation),
   });
   const rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerMinute, config.rateLimitBurst);
-  const metrics = new GatewayMetrics();
 
   app.addHook("onRequest", async (request, reply) => {
     requestStates.set(request, { startedAt: Date.now() });
@@ -408,7 +412,7 @@ export function createGateway({ config, renderer, eventSink }: CreateGatewayOpti
         .header("Cache-Control", renderRequest.cache?.mode === "no-store" ? "no-store" : "private, max-age=3600")
         .header("X-Cache", result.cache)
         .header("X-Diagram-Engine", canonicalDiagramEngine(renderRequest.engine))
-        .header("X-Renderer-Version", config.rendererVersion)
+        .header("X-Renderer-Version", result.rendererVersion)
         .type(outputContentType(renderRequest.format))
         .send(result.body);
     } catch (error) {
@@ -503,19 +507,20 @@ export function createGateway({ config, renderer, eventSink }: CreateGatewayOpti
 
   async function readiness(request: FastifyRequest, reply: FastifyReply): Promise<void> {
     const started = Date.now();
-    const ready = await renderer.ready();
+    const capabilities = await renderer.capabilities();
+    const ready = capabilities.every((engine) => engine.available);
     const statusCode = ready ? 200 : 503;
     await reply.code(statusCode).send({
       status: ready ? "up" : "down",
       service: "diagram-gateway",
       version: config.gatewayVersion,
       timestamp: new Date().toISOString(),
-      checks: [{
-        name: "kroki-core",
-        status: ready ? "up" : "down",
+      checks: capabilities.map((engine) => ({
+        name: engine.id,
+        status: engine.available ? "up" : "down",
         latencyMs: Date.now() - started,
-        ...(ready ? {} : { detail: "Kroki backend is not ready" }),
-      }],
+        ...(engine.unavailableReason === undefined ? {} : { detail: engine.unavailableReason }),
+      })),
     });
   }
 
@@ -538,16 +543,10 @@ export function createGateway({ config, renderer, eventSink }: CreateGatewayOpti
   }
 
   app.get("/api/v1/engines", async () => {
-    const available = await renderer.ready();
     return {
       apiVersion: "v1",
       generatedAt: new Date().toISOString(),
-      engines: [
-        { id: "mermaid", aliases: [], version: config.rendererVersion, formats: ["svg", "png"], available },
-        { id: "plantuml", aliases: ["c4plantuml"], version: config.rendererVersion, formats: ["svg", "png"], available },
-        { id: "graphviz", aliases: ["dot"], version: config.rendererVersion, formats: ["svg", "png"], available },
-        { id: "d2", aliases: [], version: config.rendererVersion, formats: ["svg"], available },
-      ].map((engine) => available ? engine : { ...engine, unavailableReason: "Kroki backend is not ready" }),
+      engines: await renderer.capabilities(),
     };
   });
 

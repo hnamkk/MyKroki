@@ -168,13 +168,13 @@ product/gateway/
 ├── src/
 │   ├── app.ts            Fastify application, routes và lifecycle hooks
 │   ├── config.ts         Environment/config mapping
-│   ├── render-service.ts Render orchestration, cache và single-flight
+│   ├── render-service.ts Render orchestration, cache degradation và single-flight
+│   ├── result-cache.ts  ResultCache port và weighted TTL in-memory adapter
 │   ├── renderer.ts       Kroki HTTP adapter và structured renderer errors
 │   ├── server.ts         Process bootstrap
 │   ├── auth/             Authenticator, principal, API key và OIDC
 │   ├── policy/           Scope và repository/workflow policies
 │   ├── ratelimit/        Token bucket và key resolver
-│   ├── cache/            ResultCache port, in-memory/Redis adapters
 │   ├── sanitize/         SVG output policy
 │   └── observability/    Logging, metrics và tracing
 └── test/                 Unit và HTTP contract tests
@@ -268,7 +268,7 @@ Content-Type: application/problem+json
 
 `RenderService` nhận `CanonicalRenderRequest`, không nhận trực tiếp DTO HTTP. Trình tự:
 
-1. Lấy renderer version snapshot từ `EngineRegistry`.
+1. Lấy capability snapshot theo engine từ Kroki `/health` và active probe đã cache tối đa 5 giây.
 2. Tạo cache key và kiểm tra cache.
 3. Dùng single-flight để các request cùng key chờ một render đang chạy.
 4. Acquire global và engine bulkhead với deadline.
@@ -296,7 +296,7 @@ Không tự động retry syntax error. Với lỗi kết nối xảy ra trướ
 | Render quá deadline | 504 | `RENDER_TIMEOUT` |
 | Lỗi không phân loại | 500 | `INTERNAL_ERROR` |
 
-Stack trace và source không được đưa vào response production. `requestId` cho phép truy vết log nội bộ.
+Gateway đọc lỗi Kroki dưới dạng JSON, chỉ giữ message an toàn và trích line/column bằng parser theo mẫu lỗi mà engine cung cấp. Dòng stack trace, đường dẫn nội bộ và source không được đưa vào response production. `requestId` cho phép truy vết log nội bộ.
 
 ### 3.2 Kroki fork và renderer workers
 
@@ -317,6 +317,8 @@ Các thay đổi được phép trong fork:
 
 Auth, rate limit, cache tenant và GitHub policy không được đặt trong Kroki fork.
 
+Mọi thay đổi dành riêng cho fork được theo dõi tại [`docs/FORK_PATCHES.md`](FORK_PATCHES.md), kèm test, upstream reference và chiến lược rebase.
+
 #### 3.2.2 Mô hình worker hybrid
 
 | Engine | Runtime | Isolation MVP | Giao tiếp từ Kroki | Lý do |
@@ -336,7 +338,7 @@ Gateway gọi Kroki bằng HTTP đồng bộ trong private network:
 POST /mermaid/svg HTTP/1.1
 Host: kroki-core:8000
 Content-Type: text/plain; charset=utf-8
-Accept: image/svg+xml
+Accept: application/json
 Kroki-Diagram-Options-theme: default
 X-Request-Id: req_01J...
 
@@ -356,7 +358,7 @@ graph TD
   A --> B
 ```
 
-Internal calls không dùng end-user credential. Network policy chỉ cho phép Gateway gọi Kroki và Kroki gọi worker. `X-Request-Id` được truyền xuyên suốt để liên kết trace.
+Kroki vẫn trả đúng binary media type khi render thành công; `Accept: application/json` bảo đảm error path có body máy đọc được. Internal calls không dùng end-user credential. Network policy chỉ cho phép Gateway gọi Kroki và Kroki gọi worker. `X-Request-Id` được truyền xuyên suốt để liên kết trace.
 
 #### 3.2.4 Process pool và timeout
 
@@ -372,19 +374,18 @@ flowchart LR
     DP --> KILL
 ```
 
-Mỗi adapter có semaphore riêng. Lệnh CLI nhận source qua stdin, không xây shell command từ source. Khi timeout, process bị terminate rồi force-kill; stdout/stderr có giới hạn để tránh memory exhaustion.
+Mỗi adapter có semaphore riêng. Lệnh CLI nhận source qua stdin, không xây shell command từ source. Khi timeout, lỗi I/O hoặc thread bị interrupt, process cha và toàn bộ descendant bị force-kill; stdout/stderr có giới hạn để tránh memory exhaustion. Companion request dùng deadline cấu hình và không chuyển stack trace của worker vào raw renderer error.
 
 #### 3.2.5 Health model
 
 | Endpoint | Kiểm tra | Dùng cho |
 |---|---|---|
-| Kroki `/health/live` | Event loop/process còn sống | Container liveness |
-| Kroki `/health/ready` | Registry khởi tạo và engine bắt buộc có binary/library | Readiness |
+| Kroki `/health` | Process/registry còn sống và công bố version theo route engine | Gateway discovery và container health |
 | Worker `/health/live` | HTTP process/Chromium supervisor sống | Worker liveness |
 | Worker `/health/ready` | Render sample nhỏ hoặc browser page sẵn sàng | Worker readiness |
-| Gateway `/api/v1/engines` | Tổng hợp version và availability | Client capability discovery |
+| Gateway `/api/v1/engines` | Tổng hợp version từ Kroki health và active probe nhỏ cho từng engine | Client capability discovery |
 
-Gateway không cache engine availability quá 30 giây. Một worker lỗi chỉ đánh dấu engine liên quan unavailable.
+Gateway cache capability snapshot 5 giây tính từ khi toàn bộ probe hoàn tất, thấp hơn giới hạn thiết kế 30 giây; refresh đồng thời dùng single-flight. Probe PlantUML bao gồm cả C4 alias; probe Graphviz/DOT và D2 chạy độc lập; Mermaid probe đi qua companion. Một worker lỗi chỉ đánh dấu engine liên quan unavailable, còn render route của engine khỏe vẫn hoạt động. Readiness chỉ `up` khi cả bốn engine MVP sẵn sàng.
 
 ### 3.3 Cache layer
 
@@ -392,9 +393,8 @@ Gateway không cache engine availability quá 30 giây. Một worker lỗi chỉ
 
 ```typescript
 interface ResultCache {
-  get(key: CacheKey): Promise<CachedRender | undefined>;
-  put(key: CacheKey, value: CachedRender, ttlMs: number): Promise<void>;
-  invalidate(key: CacheKey): Promise<void>;
+  get(key: string): Promise<Buffer | undefined>;
+  set(key: string, value: Buffer): Promise<boolean>;
 }
 ```
 
@@ -444,7 +444,7 @@ render:v1:<SHA-256(canonical-json)>
 
 Baseline MVP: TTL 24 giờ, maximum weight 256 MiB/instance và không cache response lớn hơn 5 MiB. Các giá trị cấu hình được. Syntax error không được cache ở MVP. `Cache-Control: no-store` hoặc policy private `noStore` làm bỏ qua cả read và write.
 
-Single-flight map theo cache key ngăn cache stampede; entry single-flight bị xóa trong `finally`, kể cả khi render lỗi.
+Single-flight map theo cache key ngăn cache stampede; entry single-flight bị xóa trong `finally`, kể cả khi render lỗi. Lỗi adapter cache được xem là cache miss/write skip để backend khỏe vẫn trả kết quả; adapter bất đồng bộ cho phép bổ sung Redis mà không đổi client API.
 
 ### 3.4 VS Code Extension
 
@@ -786,15 +786,18 @@ Ví dụ:
 ```json
 {
   "apiVersion": "v1",
+  "generatedAt": "2026-07-22T05:00:00Z",
   "engines": [
     {
       "id": "mermaid",
+      "aliases": [],
       "version": "11.15.0",
       "formats": ["svg", "png"],
       "available": true
     },
     {
       "id": "plantuml",
+      "aliases": ["c4plantuml"],
       "version": "1.2026.6",
       "formats": ["svg", "png"],
       "available": true
@@ -1057,6 +1060,9 @@ Manifest là `Should`; MVP vẫn có thể render lại và so output hash trự
 | `RATE_LIMIT_PER_MINUTE` | `60` | Token refill theo principal |
 | `RATE_LIMIT_BURST` | `10` | Token bucket capacity |
 | `CACHE_MAX_ENTRIES` | `500` | Số entry tối đa của LRU cache in-memory |
+| `CACHE_MAX_BYTES` | `268435456` | Tổng trọng lượng cache tối đa, mặc định 256 MiB |
+| `CACHE_MAX_ITEM_BYTES` | `5242880` | Output lớn hơn ngưỡng này không được cache, mặc định 5 MiB |
+| `CACHE_TTL_MS` | `86400000` | TTL entry cache, mặc định 24 giờ |
 | `RENDERER_VERSION` | `kroki-0.31.1` | Tham gia cache key |
 | `SANITIZER_VERSION` | `svg-sanitizer-1` | Tham gia cache key |
 | `METRICS_ENABLED` | `true` | Có đăng ký `/metrics` hay không |
