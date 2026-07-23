@@ -6,7 +6,7 @@
   "main": "dist/index.cjs",
   "scripts": {
     "prebuild": "npm --workspace=@diagram-as-code/contracts run build && npm --workspace=@diagram-as-code/diagram-config run build",
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node24 --format=cjs --minify --legal-comments=none --outfile=dist/index.cjs",
+    "build": "node scripts/build.mjs",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },

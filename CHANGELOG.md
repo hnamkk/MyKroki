@@ -25,6 +25,10 @@ versioned entry and uses it as the GitHub release notes.
 - Make Product CI build Kroki and Mermaid from the same checkout, trigger on fork/renderer changes, bound every E2E stage, and persist fork image layers.
 - Make Node SEA renderer stages reproducible with lockfile installs, optional native tooling, and host-independent lint input.
 
+### Fixed
+
+- Make the bundled GitHub Action start correctly on the Node.js 24 runner by preserving `import.meta.url` semantics in its CommonJS bundle.
+
 ## [0.31.1] - 2026-07-15
 
 ### Changed
