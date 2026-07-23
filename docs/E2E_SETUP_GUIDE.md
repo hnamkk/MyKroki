@@ -255,7 +255,17 @@ product/examples/pilot-repository/generated/
 
 Script chờ readiness, dùng shared parser/path planner và gửi request qua public Gateway API. Có đúng bốn output hoặc lệnh fail.
 
-### 7.2 Tạo repository pilot thật
+### 7.2 Chạy GitHub Action ngay trong MyKroki
+
+Workflow `.github/workflows/diagram-check.yml` dùng `.diagram-pilot.yml` ở root. Cấu hình này trỏ tới source và bốn SVG committed trong `product/examples/pilot-repository`, phù hợp với self-hosted runner đang truy cập Gateway tại `http://localhost:9000`.
+
+1. Đặt Actions variable `DIAGRAM_GATEWAY_URL=http://localhost:9000`.
+2. Đặt Actions secret `DIAGRAM_API_KEY` bằng plaintext key `dg_...`.
+3. Giữ `run.cmd` và Docker Compose hoạt động.
+4. Chạy workflow `Diagram check` bằng `workflow_dispatch` trên branch cần nghiệm thu.
+5. Kết quả đạt khi bốn diagram được kiểm tra, `stale-count=0` và artifact preview được upload.
+
+### 7.3 Tạo repository pilot thật
 
 1. Tạo repository trống.
 2. Copy nội dung trong `product/examples/pilot-repository/` vào root repository.

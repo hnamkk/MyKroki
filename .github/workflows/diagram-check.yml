@@ -20,5 +20,5 @@ jobs:
         with:
           gateway-url: ${{ vars.DIAGRAM_GATEWAY_URL }}
           api-key: ${{ secrets.DIAGRAM_API_KEY }}
-          config-path: product/github-action/e2e/.diagram.yml
+          config-path: .diagram-pilot.yml
           changed-only: "false"
