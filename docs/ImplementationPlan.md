@@ -20,11 +20,11 @@ MVP được xem là hoàn thiện khi một người dùng có thể:
 6. Nhận output SVG ổn định; nhận PNG ở engine công bố hỗ trợ.
 7. Vận hành với auth, rate limit, timeout, concurrency limit, cache, health check, log an toàn và SVG sanitization.
 
-OIDC, Redis, playground và auto-commit không chặn MVP trừ khi mentor thay đổi priority.
+OIDC đã hoàn thành ở Phase 5. Redis, playground và auto-commit không chặn MVP trừ khi mentor thay đổi priority.
 
 ### 2.2 Bản phát hành hoàn thiện sau MVP
 
-Bản sau MVP bổ sung OIDC cho GitHub Actions, repository policy, metrics đầy đủ, khả năng scale nhiều Gateway instance và các tính năng `Should`. Các yêu cầu `Could` chỉ được đưa vào backlog khi MVP đã đạt exit criteria.
+Sau khi hoàn thành OIDC/repository policy ở Phase 5, phần còn lại của bản sau MVP tập trung vào metrics đầy đủ, khả năng scale nhiều Gateway instance và các tính năng `Should`. Các yêu cầu `Could` chỉ được đưa vào backlog khi MVP đã đạt exit criteria.
 
 ## 3. Nguyên tắc thực hiện
 
@@ -47,7 +47,7 @@ Bản sau MVP bổ sung OIDC cho GitHub Actions, repository policy, metrics đ�
 | Gateway API | Ba render route OpenAPI, health, engine discovery, scoped API-key principal, verifier lifecycle, body/output limit, timeout, bulkhead, partitioned weighted TTL LRU/single-flight, cache degradation, rate limit, sanitizer, structured log và metrics | Phase 1 hoàn thành; shared state nhiều replica thuộc phase sau. |
 | Renderer | SVG/PNG acceptance cho engine hỗ trợ, C4/DOT alias, version/availability theo engine, secure include, structured error, determinism và failure isolation | Phase 2 hoàn thành; performance/soak mở rộng thuộc phase 6. |
 | VS Code | Phase 4 hoàn thành: năm file type, stale-safe preview, diagnostics, SVG/PNG export, atomic render-on-save, connection command, zoom controls, SecretStorage và shared request/path planner | Markdown fenced preview và VS Code Web là `Could`, không thuộc MVP. |
-| GitHub Action | API-key/local-auth render, strict input/path guard, changed-file planning, read-only check, annotation, artifact preview, failure taxonomy và transactional `generate` | Phase 3 hoàn thành; OIDC thuộc phase 5, trusted commit thuộc phase 8. |
+| GitHub Action | API-key/local-auth/OIDC render, strict input/path guard, changed-file planning, read-only check, annotation, artifact preview, failure taxonomy và transactional `generate` | Phase 3 và 5 hoàn thành; trusted commit thuộc phase 8. |
 | Operations | Compose, automated renderer gates, native-only PR image build, persistent BuildKit layer cache, clean build/test, Gateway metrics/log redaction, VSIX và release bundle | Thiếu performance/security suite và centralized telemetry. |
 
 ## 5. Tổng quan các phase
@@ -59,7 +59,7 @@ Bản sau MVP bổ sung OIDC cho GitHub Actions, repository policy, metrics đ�
 | 2 | Renderer và Kroki hardening | Đảm bảo bốn engine/format, secure mode và error metadata | Phase 1 một phần | Đã hoàn thành |
 | 3 | GitHub Action MVP | Hoàn thiện `check`, artifact, annotation và `generate` | Phase 1, 2 | Đã hoàn thành |
 | 4 | VS Code Extension MVP | Hoàn thiện diagnostics, export, render-on-save và UX preview | Phase 1, 2 | Đã hoàn thành |
-| 5 | OIDC và policy | Hỗ trợ GitHub public/private không phụ thuộc repository secret | Phase 1, 3 | 8-12 ngày công |
+| 5 | OIDC và policy | Hỗ trợ GitHub public/private không phụ thuộc repository secret | Phase 1, 3 | Đã hoàn thành |
 | 6 | Reliability và quality gates | E2E, performance, security và flaky-test control | Phase 1-5 | 6-10 ngày công |
 | 7 | Pilot và phát hành | Tài liệu, packaging, upgrade/rollback và pilot repository | Phase 6 | 4-7 ngày công |
 | 8 | Sau MVP | Redis, playground, trusted commit và renderer mở rộng | Phase 7 | Lập kế hoạch riêng |
@@ -286,6 +286,19 @@ Hoàn thiện vòng lặp authoring: preview nhanh, lỗi đúng vị trí, expo
 
 Cho GitHub Action gọi hosted Gateway mà không cần repository secret, đồng thời xử lý public/private repository bằng cùng policy dựa trên immutable claims.
 
+### Trạng thái
+
+Đã hoàn thành.
+
+### Deliverable đã đạt
+
+- Gateway xác minh RS256 GitHub JWT theo issuer, custom audience, expiry/nbf và JWKS có cache, rotation, cooldown, timeout.
+- Repository policy dùng immutable `repository_id`, workflow ref và policy riêng cho `pull_request`, `push`, `workflow_dispatch`.
+- Action có `auto`, `oidc`, `api-key`, `none`; strict OIDC không fallback, auto fallback API key có cảnh báo và không dùng PAT.
+- Public/private/fork PR, wrong issuer/audience/expiry/workflow/ref, revoked policy và JWKS outage đều có test.
+- Audit event có principal, repository ID, workflow/event/ref và policy decision nhưng không chứa JWT hoặc source.
+- ADR-008 chốt dùng GitHub JWT trực tiếp trên render route, không thêm token-exchange endpoint.
+
 ### Work packages
 
 | ID | Công việc | Deliverable | Requirement/Test | Priority |
@@ -450,6 +463,7 @@ Backlog bắt đầu nên theo thứ tự:
 1. Khóa Gateway/renderer contract đã hoàn thành từ phase 2.
 2. GitHub Action MVP phase 3 đã hoàn thành.
 3. VS Code Extension MVP phase 4 đã hoàn thành.
-4. Tiếp theo triển khai OIDC/repository policy phase 5 hoặc reliability gates phase 6 theo ưu tiên mentor.
+4. OIDC/repository policy phase 5 đã hoàn thành.
+5. Tiếp theo triển khai reliability và quality gates phase 6.
 
-Không bắt đầu OIDC trước khi API-key principal, scope và policy boundary của phase 1 ổn định.
+Phase 6 dùng các OIDC/policy fixture của phase 5 để mở rộng Compose E2E, security và flaky-test control.

@@ -27,6 +27,11 @@ import {
   type Principal,
 } from "./auth.js";
 import { RenderCapacityExceeded } from "./bulkhead.js";
+import {
+  GitHubOidcAuthenticator,
+  GitHubOidcError,
+  type OidcAuditContext,
+} from "./github-oidc.js";
 import { GatewayMetrics } from "./metrics.js";
 import { InvalidRenderOutput, RenderOutputTooLarge } from "./output-validator.js";
 import { RenderService } from "./render-service.js";
@@ -62,12 +67,19 @@ interface CreateGatewayOptions {
   config: GatewayConfig;
   renderer: RendererClient;
   eventSink?: (event: GatewayRenderEvent) => void;
+  oidcAuthenticator?: GitHubOidcAuthenticator;
 }
 
 export interface GatewayRenderEvent {
   event: "render_request_completed";
   requestId: string;
   principalSubject: string;
+  authMethod?: Principal["authMethod"];
+  repositoryId?: string;
+  workflowRef?: string;
+  eventName?: string;
+  ref?: string;
+  policyDecision?: "allowed" | "denied" | "unavailable";
   engine: string;
   format: string;
   durationMs: number;
@@ -79,6 +91,7 @@ export interface GatewayRenderEvent {
 interface RequestState {
   startedAt: number;
   principal?: Principal;
+  oidcAudit?: OidcAuditContext;
   engine?: string;
   format?: string;
   cache?: "HIT" | "MISS" | "BYPASS";
@@ -190,7 +203,7 @@ function decodeSource(encodedSource: string, maxSourceBytes: number): string {
   }
 }
 
-export function createGateway({ config, renderer, eventSink }: CreateGatewayOptions) {
+export function createGateway({ config, renderer, eventSink, oidcAuthenticator }: CreateGatewayOptions) {
   const app = Fastify({
     logger: config.logLevel === "silent" ? false : {
       level: config.logLevel,
@@ -214,6 +227,8 @@ export function createGateway({ config, renderer, eventSink }: CreateGatewayOpti
     onCacheError: (operation) => metrics.recordCacheError(operation),
   });
   const rateLimiter = new TokenBucketRateLimiter(config.rateLimitPerMinute, config.rateLimitBurst);
+  const githubOidcAuthenticator = oidcAuthenticator
+    ?? (config.githubOidc ? new GitHubOidcAuthenticator(config.githubOidc) : undefined);
 
   app.addHook("onRequest", async (request, reply) => {
     requestStates.set(request, { startedAt: Date.now() });
@@ -224,10 +239,22 @@ export function createGateway({ config, renderer, eventSink }: CreateGatewayOpti
     if (!request.url.startsWith("/api/v1/render")) return;
     const state = requestStates.get(request);
     if (!state) return;
+    const repositoryId = state.principal?.repositoryId ?? state.oidcAudit?.repositoryId;
+    const workflowRef = state.principal?.workflowRef ?? state.oidcAudit?.workflowRef;
+    const eventName = state.principal?.eventName ?? state.oidcAudit?.eventName;
+    const gitRef = state.principal?.ref ?? state.oidcAudit?.ref;
+    const policyDecision = state.principal?.policyDecision ?? state.oidcAudit?.policyDecision;
     const event: GatewayRenderEvent = {
       event: "render_request_completed",
       requestId: request.id,
-      principalSubject: state.principal?.subject ?? "anonymous",
+      principalSubject: state.principal?.subject
+        ?? (state.oidcAudit?.repositoryId ? `github-repository:${state.oidcAudit.repositoryId}` : "anonymous"),
+      ...(state.principal?.authMethod === undefined ? {} : { authMethod: state.principal.authMethod }),
+      ...(repositoryId === undefined ? {} : { repositoryId }),
+      ...(workflowRef === undefined ? {} : { workflowRef }),
+      ...(eventName === undefined ? {} : { eventName }),
+      ...(gitRef === undefined ? {} : { ref: gitRef }),
+      ...(policyDecision === undefined ? {} : { policyDecision }),
       engine: state.engine ?? "unknown",
       format: state.format ?? "unknown",
       durationMs: Math.max(0, Date.now() - state.startedAt),
@@ -288,7 +315,32 @@ export function createGateway({ config, renderer, eventSink }: CreateGatewayOpti
     }
     const authorization = request.headers.authorization ?? "";
     const candidate = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
-    const principal = candidate ? authenticateApiKey(candidate, config.apiKeyRecords) : undefined;
+    let principal = candidate ? authenticateApiKey(candidate, config.apiKeyRecords) : undefined;
+    if (!principal && candidate && githubOidcAuthenticator && candidate.split(".").length === 3) {
+      try {
+        principal = await githubOidcAuthenticator.authenticate(candidate);
+      } catch (error) {
+        if (!(error instanceof GitHubOidcError)) throw error;
+        if (state) state.oidcAudit = error.audit;
+        if (error.status === 401) {
+          void reply.header("WWW-Authenticate", 'Bearer realm="diagram-gateway", error="invalid_token"');
+        }
+        await sendProblem(
+          request,
+          reply,
+          error.status,
+          error.code,
+          error.status === 403
+            ? "GitHub workflow không được phép"
+            : error.status === 503
+              ? "GitHub OIDC tạm thời không khả dụng"
+              : "GitHub OIDC token không hợp lệ",
+          error.message,
+          error.status === 503 ? { retryAfterSeconds: 5 } : {},
+        );
+        return;
+      }
+    }
     if (!principal) {
       void reply.header("WWW-Authenticate", 'Bearer realm="diagram-gateway"');
       await sendProblem(

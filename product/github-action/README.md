@@ -13,6 +13,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   diagrams:
@@ -24,12 +25,13 @@ jobs:
       - uses: hnamkk/MyKroki/product/github-action@main
         with:
           gateway-url: ${{ vars.DIAGRAM_GATEWAY_URL }}
-          api-key: ${{ secrets.DIAGRAM_API_KEY }}
+          auth-mode: oidc
+          oidc-audience: diagram-gateway
 ```
 
-`fetch-depth: 0` cho phép Action so sánh với base commit của pull request. Nếu Gateway chạy trong mạng riêng, dùng self-hosted runner có thể kết nối tới Gateway. Với Gateway local không bật auth có thể bỏ `api-key`; Gateway hosted dùng API key lưu trong GitHub Actions Secret.
+`fetch-depth: 0` cho phép Action so sánh với base commit của pull request. `id-token: write` chỉ cho phép job xin JWT từ GitHub, không cấp quyền ghi repository. `oidc-audience` phải trùng `GITHUB_OIDC_AUDIENCE` của Gateway; Gateway phải allowlist immutable repository ID và workflow ref. Nếu Gateway chạy trong mạng riêng, dùng self-hosted runner có thể kết nối tới Gateway.
 
-Action mặc định chạy `check`, chỉ cần `contents: read`, không ghi file, không commit và không post comment. Nó upload artifact `diagram-previews` chứa output render và `manifest.json`, đồng thời fail khi source lỗi hoặc generated output bị thiếu, stale hay orphaned.
+Action mặc định chạy `check`, chỉ có quyền repository `contents: read`, không ghi file, không commit và không post comment. OIDC bổ sung `id-token: write` chỉ để xin identity token. Action upload artifact `diagram-previews` chứa output render và `manifest.json`, đồng thời fail khi source lỗi hoặc generated output bị thiếu, stale hay orphaned.
 
 ## Generate trên event đáng tin cậy
 
@@ -41,6 +43,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write
 
 jobs:
   generate:
@@ -50,7 +53,8 @@ jobs:
       - uses: hnamkk/MyKroki/product/github-action@main
         with:
           gateway-url: ${{ vars.DIAGRAM_GATEWAY_URL }}
-          api-key: ${{ secrets.DIAGRAM_API_KEY }}
+          auth-mode: oidc
+          oidc-audience: diagram-gateway
           mode: generate
           changed-only: "false"
       - uses: actions/upload-artifact@v6
@@ -67,6 +71,8 @@ jobs:
 |---|---|---|
 | `gateway-url` | bắt buộc | Base URL HTTP(S) của Gateway, không được chứa credential. |
 | `api-key` | rỗng | API key từ GitHub Secret; được mask ngay khi Action bắt đầu. |
+| `auth-mode` | `auto` | `auto`, `oidc`, `api-key` hoặc `none`. `auto` ưu tiên OIDC khi có audience và chỉ fallback khi API key được cấu hình. |
+| `oidc-audience` | rỗng | Custom audience xin từ GitHub và được Gateway xác minh. Bắt buộc với `auth-mode: oidc`. |
 | `config-path` | `.diagram.yml` | Đường dẫn tương đối trong repository. |
 | `mode` | `check` | `check` hoặc `generate`. |
 | `changed-only` | `true` | Chỉ áp dụng trên PR; config/lock đổi sẽ tự full render. |
@@ -77,8 +83,22 @@ Action trả `checked-count`, `stale-count` và `generated-count`. Lỗi Gateway
 
 ## Public, private và fork repository
 
-- Repository private dùng `DIAGRAM_API_KEY` trong Actions Secret; không đặt key trong `.diagram.yml`, workflow, variable hay artifact.
-- Pull request cùng repository nhận secret theo policy GitHub và chạy read-only với `contents: read`.
-- Pull request từ fork không nhận repository secret. Khi Gateway yêu cầu API key, job sẽ fail auth rõ ràng; có thể skip job fork và cho maintainer chạy `workflow_dispatch` sau khi review.
+- Public và private repository dùng cùng OIDC policy theo immutable `repository_id`; rename repository không làm đổi danh tính được allowlist.
+- Pull request cùng repository hoặc từ fork chạy read-only với `contents: read` và xin JWT bằng `id-token: write`; không cần repository secret hay PAT.
+- Gateway giới hạn workflow, event và ref riêng cho `pull_request`, `push`, `workflow_dispatch`. Policy không cho phép event sẽ nhận 403.
 - Không dùng `pull_request_target` để checkout rồi thực thi code chưa tin cậy nhằm lấy secret.
-- OIDC không secret là phase kế tiếp; Phase 3 chỉ hỗ trợ API key hoặc Gateway local no-auth.
+- `generate` vẫn bị cấm trên pull request kể cả OIDC hợp lệ. OIDC chỉ cấp scope render, không trao quyền commit/push.
+
+## API key fallback và local no-auth
+
+Gateway cũ hoặc deployment chưa bật OIDC có thể dùng:
+
+```yaml
+      - uses: hnamkk/MyKroki/product/github-action@main
+        with:
+          gateway-url: ${{ vars.DIAGRAM_GATEWAY_URL }}
+          auth-mode: api-key
+          api-key: ${{ secrets.DIAGRAM_API_KEY }}
+```
+
+`auth-mode: auto` dùng OIDC khi có `oidc-audience`; nếu GitHub không cấp token và `api-key` cũng được truyền, Action cảnh báo rồi fallback. `auth-mode: oidc` là strict và không fallback. Chỉ dùng `none` với Gateway local đã cấu hình no-auth.

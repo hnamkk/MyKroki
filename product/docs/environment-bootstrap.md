@@ -35,10 +35,11 @@ Sau đó đặt `KROKI_IMAGE=upgrade-diagram/kroki:fork-local` trong `product/de
 
 ## GitHub bên ngoài repo
 
-1. Tạo repository secret `DIAGRAM_API_KEY`.
-2. Tạo repository variable `DIAGRAM_GATEWAY_URL`, ví dụ `https://diagrams.internal.example.com`.
-3. Cài GitHub self-hosted runner trên máy có thể truy cập URL nội bộ của Gateway.
-4. Gắn label `diagram-renderer` cho runner và copy workflow mẫu từ `product/examples/github/diagram-check.yml`.
-5. Bật branch protection, yêu cầu check `Diagram check / diagrams` trước khi merge.
+1. Lấy immutable repository ID từ GitHub API hoặc trang repository và thêm policy tương ứng vào `GITHUB_OIDC_REPOSITORY_POLICIES` của Gateway.
+2. Đặt cùng custom audience trong `GITHUB_OIDC_AUDIENCE` của Gateway và input `oidc-audience` của Action.
+3. Tạo repository variable `DIAGRAM_GATEWAY_URL`, ví dụ `https://diagrams.internal.example.com`.
+4. Cài GitHub self-hosted runner trên máy có thể truy cập URL nội bộ của Gateway nếu Gateway không public.
+5. Copy workflow mẫu từ `product/examples/github/diagram-check.yml`; giữ `contents: read`, `id-token: write`, `auth-mode: oidc`.
+6. Bật branch protection, yêu cầu check `Diagram check / diagrams` trước khi merge.
 
-Không đưa API key vào `.diagram.yml`, source code, workflow literal hoặc log.
+OIDC không cần PAT hoặc repository secret. Nếu deployment dùng API-key fallback, tạo secret `DIAGRAM_API_KEY`; không đưa key vào `.diagram.yml`, source code, workflow literal hoặc log.

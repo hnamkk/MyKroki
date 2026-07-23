@@ -16,9 +16,10 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@xmldom/xmldom": "^0.8.11",
     "@diagram-as-code/contracts": "0.1.0",
+    "@xmldom/xmldom": "^0.8.11",
     "fastify": "^5.6.0",
+    "jose": "^6.1.0",
     "zod": "^4.1.0"
   }
 }

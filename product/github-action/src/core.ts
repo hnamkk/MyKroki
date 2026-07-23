@@ -19,10 +19,13 @@ export interface VerificationItem {
 }
 
 export type ActionMode = "check" | "generate";
+export type ActionAuthMode = "auto" | "oidc" | "api-key" | "none";
 
 export interface ActionInputs {
   gatewayUrl: string;
   apiKey: string | undefined;
+  authMode: ActionAuthMode;
+  oidcAudience: string | undefined;
   configPath: string;
   mode: ActionMode;
   changedOnly: boolean;
@@ -76,10 +79,16 @@ export function parseActionInputs(values: Record<string, string>): ActionInputs 
   if (artifactName.length > 128 || /[\\/\x00-\x1f]/.test(artifactName)) {
     throw new Error("Input 'artifact-name' must be at most 128 characters and contain no path separators or control characters.");
   }
+  const authMode = (values["auth-mode"]?.trim().toLowerCase() || "auto") as ActionAuthMode;
+  if (!["auto", "oidc", "api-key", "none"].includes(authMode)) {
+    throw new Error("Input 'auth-mode' must be 'auto', 'oidc', 'api-key', or 'none'.");
+  }
 
   return {
     gatewayUrl: gatewayUrl.toString().replace(/\/$/, ""),
     apiKey: values["api-key"]?.trim() || undefined,
+    authMode,
+    oidcAudience: values["oidc-audience"]?.trim() || undefined,
     configPath: assertSafeRelativePath("config-path", values["config-path"] || ".diagram.yml"),
     mode,
     changedOnly: parseBooleanInput("changed-only", values["changed-only"] ?? "", true),

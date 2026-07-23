@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { RENDER_SCOPE, apiKeyVerifier, type ApiKeyRecord } from "./auth.js";
+import type { GitHubOidcConfig, GitHubRepositoryPolicy } from "./github-oidc.js";
 
 export type AuthMode = "required" | "disabled";
 export type DeploymentProfile = "local" | "production";
@@ -8,6 +9,7 @@ export type DeploymentProfile = "local" | "production";
 export interface GatewayConfig {
   authMode: AuthMode;
   apiKeyRecords: ApiKeyRecord[];
+  githubOidc: GitHubOidcConfig | undefined;
   deploymentProfile: DeploymentProfile;
   port: number;
   host: string;
@@ -38,6 +40,34 @@ const keyRecordSchema = z.object({
   status: z.enum(["active", "revoked"]).default("active"),
 }).strict();
 
+const oidcPatternSchema = z.string()
+  .min(1)
+  .max(512)
+  .refine((value) => !/[\u0000-\u001f]/.test(value) && !value.slice(0, -1).includes("*"), {
+    message: "Only a single trailing wildcard is supported",
+  });
+
+const oidcEventPolicySchema = z.object({
+  refs: z.array(oidcPatternSchema).min(1),
+  baseRefs: z.array(oidcPatternSchema).min(1).optional(),
+  headRefs: z.array(oidcPatternSchema).min(1).optional(),
+}).strict();
+
+const repositoryPolicySchema = z.object({
+  repositoryId: z.string().regex(/^\d+$/),
+  status: z.enum(["active", "revoked"]).default("active"),
+  scopes: z.array(z.string().min(1).max(64)).min(1).default([RENDER_SCOPE]),
+  cachePartition: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/).optional(),
+  workflowRefs: z.array(oidcPatternSchema).min(1),
+  events: z.object({
+    pull_request: oidcEventPolicySchema.optional(),
+    push: oidcEventPolicySchema.optional(),
+    workflow_dispatch: oidcEventPolicySchema.optional(),
+  }).strict().refine((events) => Object.keys(events).length > 0, {
+    message: "At least one event policy is required",
+  }),
+}).strict();
+
 function integerInRange(
   value: string | undefined,
   fallback: number,
@@ -63,6 +93,25 @@ function booleanValue(value: string | undefined, fallback: boolean, name: string
 function isLoopbackHost(host: string): boolean {
   const normalized = host.trim().toLowerCase().replace(/^\[|\]$/g, "");
   return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
+}
+
+function trustedOidcUrl(value: string, name: string, deploymentProfile: DeploymentProfile): string {
+  let url: URL;
+  try {
+    url = new URL(value);
+  } catch {
+    throw new Error(`${name} must be a valid absolute URL`);
+  }
+  if (url.username || url.password || url.hash) {
+    throw new Error(`${name} must not contain credentials or a fragment`);
+  }
+  if (deploymentProfile === "production" && url.protocol !== "https:") {
+    throw new Error(`${name} must use HTTPS in the production profile`);
+  }
+  if (url.protocol !== "https:" && url.protocol !== "http:") {
+    throw new Error(`${name} must use HTTP(S)`);
+  }
+  return url.toString().replace(/\/$/, "");
 }
 
 function parseKeyRecords(env: NodeJS.ProcessEnv): ApiKeyRecord[] {
@@ -107,6 +156,49 @@ function parseKeyRecords(env: NodeJS.ProcessEnv): ApiKeyRecord[] {
   return records;
 }
 
+function parseRepositoryPolicies(value: string | undefined): GitHubRepositoryPolicy[] {
+  if (!value) return [];
+  let input: unknown;
+  try {
+    input = JSON.parse(value);
+  } catch (error) {
+    throw new Error("GITHUB_OIDC_REPOSITORY_POLICIES must be valid JSON", { cause: error });
+  }
+  const parsed = z.array(repositoryPolicySchema).parse(input);
+  const ids = new Set<string>();
+  return parsed.map((policy) => {
+    if (ids.has(policy.repositoryId)) {
+      throw new Error(`Duplicate GitHub OIDC repository policy: ${policy.repositoryId}`);
+    }
+    ids.add(policy.repositoryId);
+    const eventPolicy = (candidate: {
+      refs: string[];
+      baseRefs?: string[] | undefined;
+      headRefs?: string[] | undefined;
+    }) => ({
+      refs: candidate.refs,
+      ...(candidate.baseRefs === undefined ? {} : { baseRefs: candidate.baseRefs }),
+      ...(candidate.headRefs === undefined ? {} : { headRefs: candidate.headRefs }),
+    });
+    return {
+      repositoryId: policy.repositoryId,
+      status: policy.status,
+      scopes: [...new Set(policy.scopes)],
+      cachePartition: policy.cachePartition ?? `github:${policy.repositoryId}`,
+      workflowRefs: [...new Set(policy.workflowRefs)],
+      events: {
+        ...(policy.events.pull_request === undefined
+          ? {}
+          : { pull_request: eventPolicy(policy.events.pull_request) }),
+        ...(policy.events.push === undefined ? {} : { push: eventPolicy(policy.events.push) }),
+        ...(policy.events.workflow_dispatch === undefined
+          ? {}
+          : { workflow_dispatch: eventPolicy(policy.events.workflow_dispatch) }),
+      },
+    };
+  });
+}
+
 export function loadGatewayConfig(env: NodeJS.ProcessEnv = process.env): GatewayConfig {
   const authMode = env.AUTH_MODE ?? "required";
   if (authMode !== "required" && authMode !== "disabled") {
@@ -122,8 +214,28 @@ export function loadGatewayConfig(env: NodeJS.ProcessEnv = process.env): Gateway
   }
 
   const apiKeyRecords = parseKeyRecords(env);
-  if (authMode === "required" && !apiKeyRecords.some((record) => record.status === "active")) {
-    throw new Error("At least one active API key record is required when AUTH_MODE=required");
+  const githubOidcEnabled = booleanValue(env.GITHUB_OIDC_ENABLED, false, "GITHUB_OIDC_ENABLED");
+  if (githubOidcEnabled && !env.GITHUB_OIDC_AUDIENCE) {
+    throw new Error("GITHUB_OIDC_AUDIENCE is required when GITHUB_OIDC_ENABLED=true");
+  }
+  const githubOidcAudience = env.GITHUB_OIDC_AUDIENCE?.trim();
+  if (githubOidcEnabled && (
+    !githubOidcAudience
+    || githubOidcAudience.length > 255
+    || /[\u0000-\u001f]/.test(githubOidcAudience)
+  )) {
+    throw new Error("GITHUB_OIDC_AUDIENCE must be 1-255 characters without control characters");
+  }
+  const repositoryPolicies = parseRepositoryPolicies(env.GITHUB_OIDC_REPOSITORY_POLICIES);
+  if (githubOidcEnabled && !repositoryPolicies.some((policy) => policy.status === "active")) {
+    throw new Error("At least one active GitHub repository policy is required when GITHUB_OIDC_ENABLED=true");
+  }
+  if (
+    authMode === "required"
+    && !apiKeyRecords.some((record) => record.status === "active")
+    && !githubOidcEnabled
+  ) {
+    throw new Error("At least one active API key or GitHub OIDC configuration is required when AUTH_MODE=required");
   }
 
   const logLevel = env.LOG_LEVEL ?? "info";
@@ -140,6 +252,48 @@ export function loadGatewayConfig(env: NodeJS.ProcessEnv = process.env): Gateway
   return {
     authMode,
     apiKeyRecords,
+    githubOidc: githubOidcEnabled ? {
+      issuer: trustedOidcUrl(
+        env.GITHUB_OIDC_ISSUER ?? "https://token.actions.githubusercontent.com",
+        "GITHUB_OIDC_ISSUER",
+        deploymentProfile,
+      ),
+      audience: githubOidcAudience!,
+      jwksUrl: trustedOidcUrl(
+        env.GITHUB_OIDC_JWKS_URL ?? "https://token.actions.githubusercontent.com/.well-known/jwks",
+        "GITHUB_OIDC_JWKS_URL",
+        deploymentProfile,
+      ),
+      clockToleranceSeconds: integerInRange(
+        env.GITHUB_OIDC_CLOCK_TOLERANCE_SECONDS,
+        30,
+        "GITHUB_OIDC_CLOCK_TOLERANCE_SECONDS",
+        0,
+        300,
+      ),
+      jwksCacheMaxAgeMs: integerInRange(
+        env.GITHUB_OIDC_JWKS_CACHE_MAX_AGE_MS,
+        600_000,
+        "GITHUB_OIDC_JWKS_CACHE_MAX_AGE_MS",
+        1_000,
+        86_400_000,
+      ),
+      jwksCooldownMs: integerInRange(
+        env.GITHUB_OIDC_JWKS_COOLDOWN_MS,
+        30_000,
+        "GITHUB_OIDC_JWKS_COOLDOWN_MS",
+        0,
+        3_600_000,
+      ),
+      jwksTimeoutMs: integerInRange(
+        env.GITHUB_OIDC_JWKS_TIMEOUT_MS,
+        5_000,
+        "GITHUB_OIDC_JWKS_TIMEOUT_MS",
+        100,
+        60_000,
+      ),
+      repositoryPolicies,
+    } : undefined,
     deploymentProfile,
     port: integerInRange(env.PORT, 9000, "PORT", 1, 65_535),
     host,

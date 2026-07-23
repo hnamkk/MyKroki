@@ -361,11 +361,13 @@ components:
     bearerAuth:
       type: http
       scheme: bearer
-      bearerFormat: API key or short-lived access token
+      bearerFormat: API key or GitHub OIDC JWT
       description: |
         API key là opaque bearer secret dạng `dg_<random>`. Gateway chỉ lưu SHA-256
-        verifier record; plaintext key nằm trong client secret store. Access token
-        ngắn hạn từ GitHub OIDC thuộc phase sau. Local profile có thể tắt authentication.
+        verifier record; plaintext key nằm trong client secret store. GitHub Action có
+        thể gửi GitHub OIDC JWT ngắn hạn trực tiếp; Gateway validate signature, issuer,
+        custom audience, expiry và repository/workflow/event/ref policy trước khi tạo
+        principal. Local profile có thể tắt authentication.
 
   parameters:
     Engine:
@@ -777,6 +779,14 @@ components:
                 code: UNAUTHENTICATED
                 message: Bearer credential bị thiếu hoặc không hợp lệ.
                 requestId: req_01JABCXYZ
+            invalidOidcToken:
+              dataValue:
+                type: /problems/oidc-token-invalid
+                title: GitHub OIDC token không hợp lệ
+                status: 401
+                code: OIDC_TOKEN_INVALID
+                message: GitHub OIDC token signature hoặc standard claims không hợp lệ.
+                requestId: req_01JABCXYZ
 
     Forbidden:
       description: Principal đã xác thực nhưng không được phép render.
@@ -795,6 +805,14 @@ components:
                 status: 403
                 code: FORBIDDEN
                 message: Principal không có scope diagram:render.
+                requestId: req_01JABCXYZ
+            oidcPolicyDenied:
+              dataValue:
+                type: /problems/oidc-policy-denied
+                title: GitHub workflow không được phép
+                status: 403
+                code: OIDC_POLICY_DENIED
+                message: GitHub workflow identity không khớp repository policy.
                 requestId: req_01JABCXYZ
 
     PayloadTooLarge:
@@ -917,7 +935,7 @@ components:
                 requestId: req_01JABCXYZ
                 engine: graphviz
     RendererUnavailable:
-      description: Kroki hoặc renderer worker cần thiết không khả dụng.
+      description: Kroki, renderer worker hoặc OIDC key provider cần thiết không khả dụng.
       headers:
         X-Request-Id:
           $ref: '#/components/headers/RequestId'
@@ -937,6 +955,15 @@ components:
                 message: Mermaid renderer hiện không sẵn sàng.
                 requestId: req_01JABCXYZ
                 engine: mermaid
+                retryAfterSeconds: 5
+            oidcProviderUnavailable:
+              dataValue:
+                type: /problems/oidc-provider-unavailable
+                title: GitHub OIDC tạm thời không khả dụng
+                status: 503
+                code: OIDC_PROVIDER_UNAVAILABLE
+                message: GitHub OIDC signing keys tạm thời không khả dụng.
+                requestId: req_01JABCXYZ
                 retryAfterSeconds: 5
 
     ServiceNotReady:

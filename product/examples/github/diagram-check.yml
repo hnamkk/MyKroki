@@ -8,6 +8,10 @@ on:
       - ".diagram.yml"
       - ".diagram-renderer.lock"
 
+permissions:
+  contents: read
+  id-token: write
+
 jobs:
   diagrams:
     runs-on: [self-hosted, diagram-renderer]
@@ -18,4 +22,5 @@ jobs:
       - uses: hnamkk/MyKroki/product/github-action@main
         with:
           gateway-url: ${{ vars.DIAGRAM_GATEWAY_URL }}
-          api-key: ${{ secrets.DIAGRAM_API_KEY }}
+          auth-mode: oidc
+          oidc-audience: diagram-gateway
