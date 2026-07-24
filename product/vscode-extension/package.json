@@ -5,7 +5,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "publisher": "diagram-as-code",
+  "publisher": "hnamkk",
+  "icon": "resources/icon.png",
+  "galleryBanner": {
+    "color": "#202a36",
+    "theme": "dark"
+  },
+  "keywords": ["diagram", "mermaid", "plantuml", "graphviz", "d2", "kroki"],
   "license": "MIT",
   "repository": {
     "type": "git",
@@ -17,7 +23,7 @@
   },
   "categories": ["Visualization", "Other"],
   "main": "./dist/extension.cjs",
-  "files": ["dist/extension.cjs", "README.md", "CHANGELOG.md", "LICENSE"],
+  "files": ["dist/extension.cjs", "resources/icon.png", "README.md", "CHANGELOG.md", "LICENSE"],
   "scripts": {
     "prebuild": "npm --workspace=@diagram-as-code/contracts run build && npm --workspace=@diagram-as-code/diagram-config run build",
     "build": "esbuild src/extension.ts --bundle --platform=node --format=cjs --external:vscode --outfile=dist/extension.cjs",

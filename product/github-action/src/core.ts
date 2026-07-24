@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { existsSync, realpathSync } from "node:fs";
 import path from "node:path";
 import {
@@ -174,6 +175,29 @@ export function deterministicRequest(
   return deterministicRenderRequest(sourcePath, source, config);
 }
 
+export interface PullRequestContext {
+  repository: string;
+  serverUrl: string;
+  number: number;
+  baseSha: string;
+  headSha: string;
+}
+
+export interface DiagramReviewRow {
+  status: string;
+  source: string;
+  generatedOutput: string;
+  before: string;
+  after: string;
+  visualDiff: string;
+}
+
+export interface ReviewableOutcome {
+  sourcePath?: string;
+  outputPath: string;
+  status: string;
+}
+
 export function parseNameStatus(output: string): FileChange[] {
   const changes: FileChange[] = [];
   for (const line of output.split(/\r?\n/).filter(Boolean)) {
@@ -187,6 +211,86 @@ export function parseNameStatus(output: string): FileChange[] {
     }
   }
   return changes;
+}
+
+export function pullRequestContextFromEvent(
+  event: unknown,
+  repository: string | undefined,
+  serverUrl: string | undefined,
+): PullRequestContext | undefined {
+  if (!repository) return undefined;
+  const pullRequest = (event as {
+    pull_request?: { number?: number; base?: { sha?: string }; head?: { sha?: string } };
+  } | undefined)?.pull_request;
+  const number = pullRequest?.number;
+  const baseSha = pullRequest?.base?.sha;
+  const headSha = pullRequest?.head?.sha;
+  if (!number || !baseSha || !headSha) return undefined;
+  return { repository, serverUrl: serverUrl ?? "https://github.com", number, baseSha, headSha };
+}
+
+function encodedPath(filePath: string): string {
+  return normalize(filePath).split("/").map(encodeURIComponent).join("/");
+}
+
+function markdownLink(label: string, url: string): string {
+  return `[${label}](${url})`;
+}
+
+function blobUrl(context: PullRequestContext, sha: string, filePath: string): string {
+  return `${context.serverUrl}/${context.repository}/blob/${sha}/${encodedPath(filePath)}`;
+}
+
+function pullRequestFileUrl(context: PullRequestContext, filePath: string): string {
+  const hash = createHash("sha256").update(normalize(filePath)).digest("hex");
+  return `${context.serverUrl}/${context.repository}/pull/${context.number}/files#diff-${hash}`;
+}
+
+export function buildDiagramReviewRows(
+  outcomes: ReviewableOutcome[],
+  changes: FileChange[],
+  context: PullRequestContext,
+): DiagramReviewRow[] {
+  const changeByPath = new Map<string, FileChange>();
+  for (const change of changes) {
+    const normalizedChange: FileChange = {
+      status: change.status,
+      path: normalize(change.path),
+      ...(change.oldPath ? { oldPath: normalize(change.oldPath) } : {}),
+    };
+    changeByPath.set(normalizedChange.path, normalizedChange);
+    if (normalizedChange.oldPath) changeByPath.set(normalizedChange.oldPath, normalizedChange);
+  }
+
+  return outcomes.flatMap((outcome): DiagramReviewRow[] => {
+    const sourcePath = outcome.sourcePath && normalize(outcome.sourcePath);
+    const outputPath = normalize(outcome.outputPath);
+    const change = (sourcePath && changeByPath.get(sourcePath)) ?? changeByPath.get(outputPath);
+    if (!change) return [];
+    const renamedFromOldPath = change.status === "R" && sourcePath === change.oldPath;
+
+    const sourceBefore = change.status === "A" || !sourcePath || (change.status === "R" && !renamedFromOldPath)
+      ? ""
+      : markdownLink("base", blobUrl(context, context.baseSha, sourcePath));
+    const sourceAfter = change.status === "D" || !sourcePath || renamedFromOldPath
+      ? ""
+      : markdownLink("source", blobUrl(context, context.headSha, sourcePath));
+    const outputBefore = change.status === "A" || (change.status === "R" && !renamedFromOldPath)
+      ? ""
+      : markdownLink("base", blobUrl(context, context.baseSha, outputPath));
+    const outputAfter = change.status === "D" || outcome.status === "orphaned" || renamedFromOldPath
+      ? ""
+      : markdownLink("head", blobUrl(context, context.headSha, outputPath));
+    const anchorPath = change.status === "R" && change.oldPath ? change.oldPath : outputPath;
+    return [{
+      status: outcome.status,
+      source: sourceAfter || sourceBefore || "-",
+      generatedOutput: markdownLink(outputPath, blobUrl(context, outcome.status === "orphaned" ? context.baseSha : context.headSha, outputPath)),
+      before: outputBefore,
+      after: outputAfter,
+      visualDiff: markdownLink("open", pullRequestFileUrl(context, anchorPath)),
+    }];
+  });
 }
 
 export function findOrphanedOutputs(

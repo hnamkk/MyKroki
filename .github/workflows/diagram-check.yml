@@ -8,9 +8,17 @@ on:
   push:
     branches:
       - main
+    paths:
+      - ".diagram-pilot.yml"
+      - "product/examples/pilot-repository/**"
+      - ".github/workflows/diagram-check.yml"
   pull_request:
     branches:
       - main
+    paths:
+      - ".diagram-pilot.yml"
+      - "product/examples/pilot-repository/**"
+      - ".github/workflows/diagram-check.yml"
   workflow_dispatch:
 
 permissions:
@@ -19,7 +27,7 @@ permissions:
 jobs:
   diagrams:
     name: Verify generated diagrams
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: vars.DIAGRAM_CHECK_ENABLED == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: [self-hosted, Windows, X64, diagram-renderer]
     timeout-minutes: 10
     steps:

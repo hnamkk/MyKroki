@@ -48,7 +48,7 @@ Sau khi hoàn thành OIDC/repository policy ở Phase 5, phần còn lại của
 | Renderer | SVG/PNG acceptance cho engine hỗ trợ, C4/DOT alias, version/availability theo engine, secure include, structured error, determinism và failure isolation | Phase 2 hoàn thành; performance/soak mở rộng thuộc phase 6. |
 | VS Code | Phase 4 hoàn thành: năm file type, stale-safe preview, diagnostics, SVG/PNG export, atomic render-on-save, connection command, zoom controls, SecretStorage và shared request/path planner | Markdown fenced preview và VS Code Web là `Could`, không thuộc MVP. |
 | GitHub Action | API-key/local-auth/OIDC render, strict input/path guard, changed-file planning, read-only check, annotation, artifact preview, failure taxonomy và transactional `generate` | Phase 3 và 5 hoàn thành; trusted commit thuộc phase 8. |
-| Operations | Compose, automated renderer gates, native-only PR image build, persistent BuildKit layer cache, clean build/test, Gateway metrics/log redaction, VSIX và release bundle | Thiếu performance/security suite và centralized telemetry. |
+| Operations | Compose, automated renderer gates, native-only PR image build, persistent BuildKit layer cache, clean build/test, Gateway metrics/log redaction, Marketplace-ready VSIX, Windows installer ZIP và release bundle | Thiếu centralized telemetry; installer cần rehearsal Docker Desktop thật. |
 
 ## 5. Tổng quan các phase
 
@@ -394,7 +394,7 @@ Chứng minh hệ thống ổn định trong điều kiện tải, lỗi depende
 | P7-03 | Operations runbook | Health, logs, metrics, key rotation, backup config, upgrade và rollback | P0 |
 | P7-04 | Pilot repository | Ít nhất một repo có bốn engine, PR stale/error case và VS Code workflow | P0 |
 | P7-05 | Acceptance session | Demo theo use case SRS; lưu issue và quyết định scope còn lại | P0 |
-| P7-06 | Release artifacts | Gateway image, Compose, VSIX, Action bundle, example config, SBOM/checksum, release notes | P0 |
+| P7-06 | Release artifacts | Gateway image, Compose, VSIX, Action bundle, Windows installer ZIP, example config, SBOM/checksum, release notes | P0 |
 | P7-07 | Go/no-go review | Security, NFR, test report, known limitations và rollback owner | P0 |
 
 ### Deliverable đã triển khai
@@ -406,7 +406,7 @@ Chứng minh hệ thống ổn định trong điều kiện tải, lỗi depende
 | P7-03 | `product/docs/infrastructure-operations.md` bao phủ health, logs, metrics, key rotation, backup, upgrade và rollback. |
 | P7-04 | `product/examples/pilot-repository` có Mermaid, C4-PlantUML, Graphviz và D2 cùng generated SVG/workflow pin version. |
 | P7-05 | Acceptance matrix và biên bản mẫu nằm trong E2E guide/go-no-go checklist; buổi sign-off thực tế còn cần mentor. |
-| P7-06 | `release:prepare` tạo VSIX, Action bundle, Compose/env/config lock, npm SBOM, manifest/checksum; tagged workflow publish và thêm SBOM ba image. |
+| P7-06 | `release:prepare` tạo VSIX, Action bundle, Windows installer ZIP, Compose/env/config lock, npm SBOM, manifest/checksum; tagged workflow publish và thêm SBOM ba image. |
 | P7-07 | `product/docs/go-no-go-checklist.md` công bố external gates, known limitations, owner và No-Go conditions. |
 
 ### Exit criteria

@@ -24,7 +24,7 @@ Lệnh này chạy audit, typecheck, test, build, đóng gói VSIX, sinh npm SPD
 product/release/product-v<version>/
 ```
 
-Thư mục chứa VSIX, Action bundle, deployment files, version lock, npm SBOM, manifest và `SHA256SUMS`. Đây là output local bị Git ignore, không commit. Tagged workflow bổ sung SBOM ba container và immutable image digest.
+Thư mục chứa VSIX, Action bundle, Windows server ZIP, deployment files, version lock, npm SBOM, manifest và `SHA256SUMS`. Đây là output local bị Git ignore, không commit. Tagged workflow bổ sung SBOM ba container và immutable image digest.
 
 ## 3. Build image local
 
@@ -62,6 +62,7 @@ Tag `product-v0.1.0` kích hoạt `Product Release`: workflow kiểm tra lại, 
 ## 5. Xác nhận sau release
 
 - Tải VSIX từ release, kiểm tra SHA-256 và cài thử trên VS Code sạch.
+- Tải Windows server ZIP, kiểm tra SHA-256, cài trên Docker Desktop sạch và xác nhận Gateway chỉ bind `127.0.0.1`.
 - Pull cả ba image theo tag/digest trong release env; không dùng `latest`.
 - Chạy `/health`, `/health/ready`, smoke test bốn renderer và một lần preview/export từ extension.
 - Xác nhận Action bằng một repository thử nghiệm trước khi bật required check.

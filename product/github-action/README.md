@@ -45,7 +45,7 @@ jobs:
 
 Đây là profile hosted/team dùng OIDC. `fetch-depth: 0` cho phép Action so sánh với base commit của pull request. `id-token: write` chỉ cho phép job xin JWT từ GitHub, không cấp quyền ghi repository. `oidc-audience` phải trùng `GITHUB_OIDC_AUDIENCE` của Gateway; Gateway phải allowlist immutable repository ID và workflow ref. Nếu Gateway chạy trong mạng riêng, dùng self-hosted runner có thể kết nối tới Gateway.
 
-Action mặc định chạy `check`, chỉ có quyền repository `contents: read`, không ghi file, không commit và không post comment. OIDC bổ sung `id-token: write` chỉ để xin identity token. Action upload artifact `diagram-previews` chứa output render và `manifest.json`, đồng thời fail khi source lỗi hoặc generated output bị thiếu, stale hay orphaned.
+Action mặc định chạy `check`, chỉ có quyền repository `contents: read`, không ghi file, không commit và không post comment. OIDC bổ sung `id-token: write` chỉ để xin identity token. Action upload artifact `diagram-previews` chứa output render và `manifest.json`, đồng thời fail khi source lỗi hoặc generated output bị thiếu, stale hay orphaned. Trên pull request, Action Summary thêm link source, output ở base/head commit và GitHub file diff cho từng diagram thay đổi; quyền xem link vẫn do GitHub repository kiểm soát.
 
 ## Generate trên event đáng tin cậy
 

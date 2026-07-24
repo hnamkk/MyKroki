@@ -125,7 +125,7 @@ export async function run(): Promise<void> {
       gateway.url,
       vscode.ConfigurationTarget.Workspace,
     );
-    const extension = vscode.extensions.getExtension("diagram-as-code.diagram-as-code-vscode");
+    const extension = vscode.extensions.getExtension("hnamkk.diagram-as-code-vscode");
     assert.ok(extension, "Extension must be installed and discoverable.");
     await extension.activate();
     console.log("Extension activated.");

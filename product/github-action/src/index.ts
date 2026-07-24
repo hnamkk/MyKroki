@@ -8,7 +8,14 @@ import fastGlob from "fast-glob";
 
 import { uploadPreviewArtifact } from "./artifact.js";
 import { resolveGatewayCredential } from "./auth-provider.js";
-import { parseActionInputs, parseNameStatus, resolveWithinRoot, type FileChange } from "./core.js";
+import {
+  buildDiagramReviewRows,
+  parseActionInputs,
+  parseNameStatus,
+  pullRequestContextFromEvent,
+  resolveWithinRoot,
+  type FileChange,
+} from "./core.js";
 import { renderDiagram } from "./gateway-client.js";
 import { createRenderRequest, runAction, type ActionOutcome, type RunActionResult } from "./runner.js";
 
@@ -16,7 +23,7 @@ interface PullRequestEvent {
   pull_request?: {
     number?: number;
     base?: { sha?: string };
-    head?: { repo?: { fork?: boolean } };
+    head?: { sha?: string; repo?: { fork?: boolean } };
   };
 }
 
@@ -52,19 +59,11 @@ function readChanges(event: PullRequestEvent): FileChange[] | undefined {
   }
 }
 
-function pullRequestFilesUrl(event: PullRequestEvent): string | undefined {
-  const repository = process.env.GITHUB_REPOSITORY;
-  const number = event.pull_request?.number;
-  return repository && number
-    ? `${process.env.GITHUB_SERVER_URL ?? "https://github.com"}/${repository}/pull/${number}/files`
-    : undefined;
-}
-
 function outcomeLabel(outcome: ActionOutcome): string {
   return outcome.status === "error" && outcome.code ? `${outcome.status} (${outcome.code})` : outcome.status;
 }
 
-async function writeSummary(result: RunActionResult, mode: "check" | "generate", filesUrl?: string): Promise<void> {
+async function writeSummary(result: RunActionResult, mode: "check" | "generate", event: PullRequestEvent, changes: FileChange[]): Promise<void> {
   const headline = mode === "check"
     ? result.failed
       ? "Diagram check requires attention."
@@ -89,7 +88,28 @@ async function writeSummary(result: RunActionResult, mode: "check" | "generate",
       ]),
     ]);
   }
-  if (filesUrl) core.summary.addRaw(`\n[Open the pull request file diff](${filesUrl})\n`);
+  const pullRequestContext = pullRequestContextFromEvent(
+    event,
+    process.env.GITHUB_REPOSITORY,
+    process.env.GITHUB_SERVER_URL,
+  );
+  if (pullRequestContext) {
+    const reviewRows = buildDiagramReviewRows(result.outcomes, changes, pullRequestContext);
+    if (reviewRows.length > 0) {
+      core.summary.addRaw("\n## Review changed diagrams\n").addTable([
+        [
+          { data: "Status", header: true },
+          { data: "Source", header: true },
+          { data: "Generated output", header: true },
+          { data: "Before", header: true },
+          { data: "After", header: true },
+          { data: "Visual diff", header: true },
+        ],
+        ...reviewRows.map((row) => [row.status, row.source, row.generatedOutput, row.before, row.after, row.visualDiff]),
+      ]);
+    }
+    core.summary.addRaw(`\n[Open the pull request file diff](${pullRequestContext.serverUrl}/${pullRequestContext.repository}/pull/${pullRequestContext.number}/files)\n`);
+  }
   await core.summary.write();
 }
 
@@ -153,7 +173,7 @@ async function run(): Promise<void> {
   core.setOutput("checked-count", result.checkedCount);
   core.setOutput("stale-count", result.staleCount);
   core.setOutput("generated-count", result.changedCount);
-  await writeSummary(result, inputs.mode, pullRequestFilesUrl(event));
+  await writeSummary(result, inputs.mode, event, changes ?? []);
   if (result.failed) {
     core.setFailed(
       result.errorCount > 0

@@ -43,7 +43,7 @@
 | VS Code | Debounce, sequence/cancellation, diagnostic mapping, atomic write, SecretStorage wrapper. | Extension Host với mock Gateway trả delayed/error/binary response. | VS Code desktop + Gateway: unsaved preview, diagnostics, export, render-on-save. |
 | GitHub Action | Input parser, change detector, auth provider, stale comparator, annotation và commit selection. | Action runner với mock/real Gateway; API key/OIDC, artifact, exit code. | Workflow trên public/private test repo: PR check, generate, optional trusted commit. |
 | Operations | Config/fail-fast, health aggregation, log redaction và metric labels. | Docker Compose, network exposure, restart và dependency failure. | Chỉ Gateway public; readiness và phục hồi renderer đúng. |
-| Release/Pilot | Version lock, manifest và checksum parser. | Bundle chứa VSIX, Action, Compose, config và SBOM; ba image cùng tag/digest. | Setup mới, pilot PR, upgrade và rollback theo artifact versioned. |
+| Release/Pilot | Version lock, manifest, checksum parser và Windows installer PowerShell. | Bundle chứa VSIX, Action, ZIP installer, Compose, config và SBOM; ba image cùng tag/digest. | Setup mới, pilot PR, upgrade và rollback theo artifact versioned. |
 
 ### 2.2 Mức kiểm thử và lịch chạy
 
@@ -74,7 +74,7 @@
 | Supply chain | Product CI `npm sbom`, Anchore SBOM và Trivy | SBOM cho npm/Gateway/Kroki/Mermaid; image build từ commit hiện tại không có High/Critical, không bỏ qua advisory chưa có bản vá. |
 | GitHub Action unit/integration | `npm test --workspace=diagram-as-code-action --prefix product` | Input/path guard, planner rename/delete/full scan, output collision, API key, HTTP taxonomy, annotation, check read-only, generate rollback, artifact manifest và committed CommonJS bundle khởi động trên Node.js 24. |
 | GitHub Action runner E2E | Job Compose trong `.github/workflows/product-ci.yml` | Bundle thật gọi Gateway thật; current/stale/syntax/auth, artifact upload, PR generate guard và trusted generate. |
-| GitHub Action personal workflow | `.github/workflows/diagram-check.yml` trên self-hosted Windows | API key + Gateway local; PR trusted chạy changed-only, push `main`/manual full scan; condition loại fork và repository policy yêu cầu approval/tắt fork workflow. |
+| GitHub Action personal workflow | `.github/workflows/diagram-check.yml` trên self-hosted Windows | Chỉ trigger khi `.diagram-pilot.yml` hoặc fixture pilot thay đổi và Variable `DIAGRAM_CHECK_ENABLED=true`; API key + Gateway local; PR trusted chạy changed-only, push `main`/manual full scan; condition loại fork và repository policy yêu cầu approval/tắt fork workflow. |
 | Pilot generation | `npm run pilot:generate --prefix product` | Shared config/planner gọi Gateway thật và tạo đúng bốn SVG Mermaid/C4/Graphviz/D2. |
 | Release bundle | `npm run release:prepare --prefix product` và `npm run release:verify --prefix product` | Đồng bộ version, VSIX/Action/Compose/config lock, SPDX SBOM, manifest và SHA-256; VSIX được package hai lần để so hash; tagged workflow bổ sung digest/SBOM ba image. |
 
@@ -111,7 +111,7 @@ OIDC (`TC-GHA-007`) đã được triển khai ở Phase 5. Auto-commit (`TC-GHA
 | VS Code E2E | VS Code stable và phiên bản tối thiểu hỗ trợ; Windows/Linux | Webview, SecretStorage, filesystem. |
 | GitHub E2E | GitHub-hosted Ubuntu; public/private test repo; protected branch | Permission, secret, OIDC, artifact, commit. |
 | Performance | Linux runner riêng, tài nguyên cố định, không có job khác | Đo p95 và workspace 100 diagram. |
-| CI quality matrix | Ubuntu 24.04 + Node.js 24 + Java 25; Windows 2025 cho Extension/path | Xác nhận runtime/OS constraints và giữ report làm artifact. |
+| CI quality matrix | Ubuntu 24.04 + Node.js 24 + Java 25; Windows 2025 cho Extension/path và Pester installer | Xác nhận runtime/OS constraints và giữ report làm artifact. |
 
 ### 3.2 Cấu hình baseline
 
@@ -257,6 +257,9 @@ Rate-limit integration test được phép dùng profile nhỏ hơn, ví dụ 6/
 | TC-GHA-013 | Invalid config | Config sai/path traversal | Chạy Action. | Fail trước render; chỉ field lỗi; không ghi ngoài workspace/output. | P0 |
 | TC-GHA-014 | Gateway failure | Gateway trả 429/503/504 | Chạy Action. | Exit khác 0; phân biệt lỗi, hiện requestId/Retry-After; không commit partial. | P0 |
 | TC-GHA-015 | Personal runner policy | Persistent self-hosted runner và Gateway local hoạt động; fork workflow bị tắt hoặc yêu cầu approval | Push `main`, mở PR trusted, rồi mô phỏng PR từ fork và không approve. | Push/PR trusted tạo check; PR changed-only; fork không được maintainer cấp job cho persistent runner. | P0 |
+| TC-GHA-016 | Visual review | Pull request thay đổi source hoặc generated output | Chạy Action check và mở Action Summary. | Mỗi diagram liên quan có link source, output base/head và GitHub file diff; summary không chứa source hoặc credential plaintext. | P1 |
+| TC-REL-001 | Windows installer | Docker Desktop và ZIP release đã kiểm checksum | Cài, status, restart, rotate key, update bằng ZIP mới và cố ý làm readiness fail. | Gateway chỉ bind loopback; `.env` chỉ có verifier; update healthy giữ credential, update fail tự rollback. | P1 |
+| TC-REL-002 | Marketplace package | VSIX được tạo từ tagged release | Cài VSIX vào profile VS Code sạch và kiểm manifest. | Icon/metadata xuất hiện; publisher, version, README và license hợp lệ; VSIX không chứa secret. | P1 |
 
 ### 4.7 Release và pilot
 

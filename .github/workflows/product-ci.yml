@@ -63,6 +63,10 @@ jobs:
         working-directory: product
       - run: npm test
         working-directory: product
+      - run: npm run test:server-bundle
+        working-directory: product
+      - run: npm run test:release-contract
+        working-directory: product
       - name: Repeat Gateway unit and integration tests
         run: node scripts/repeat-test.mjs --attempts 3 --timeout-ms 180000 --report test-results/flaky-control.json -- npm --workspace=@diagram-as-code/gateway test
         working-directory: product
@@ -161,6 +165,21 @@ jobs:
         working-directory: product
         env:
           VSCODE_TEST_VERSION: ${{ matrix.vscode-version }}
+
+  windows-installer:
+    runs-on: windows-2025
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Run Windows installer Pester tests
+        shell: powershell
+        run: |
+          $pester = Get-Module -ListAvailable Pester | Sort-Object Version -Descending | Select-Object -First 1
+          if ($null -eq $pester -or $pester.Version -lt [Version]"5.0.0") {
+            Install-Module Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
+          }
+          Import-Module Pester -MinimumVersion 5.0.0
+          Invoke-Pester -Path product/windows-installer/test -CI -Output Detailed
 
   compose:
     if: github.event_name != 'pull_request'
