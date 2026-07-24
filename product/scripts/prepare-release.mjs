@@ -3,6 +3,7 @@ import { copyFile, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { createServerBundle } from "./create-server-bundle.mjs";
 import YAML from "yaml";
 
 const productRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -108,6 +109,7 @@ for (const name of ["gateway", "kroki", "mermaid"]) {
 for (const file of files) {
   await copyFile(path.join(productRoot, file.source), path.join(releaseDirectory, file.destination));
 }
+await createServerBundle({ productRoot, releaseDirectory, version, images });
 
 const environmentExample = `# Generate a random client key, store only its SHA-256 verifier here, and keep the plaintext in the client secret store.\nDIAGRAM_API_KEY_RECORDS=[{"id":"repo-ci","verifier":"sha256:<64-lowercase-hex>","scopes":["diagram:render"],"cachePartition":"repo-ci","status":"active"}]\nGATEWAY_PORT=9000\nRATE_LIMIT_PER_MINUTE=60\nRATE_LIMIT_BURST=10\nRENDER_MAX_CONCURRENT=4\nRENDER_MAX_QUEUE=20\nMAX_OUTPUT_BYTES=10485760\nCACHE_MAX_ENTRIES=500\nCACHE_MAX_BYTES=268435456\nCACHE_MAX_ITEM_BYTES=5242880\nCACHE_TTL_MS=86400000\nGATEWAY_PIDS_LIMIT=256\nGATEWAY_MEMORY_LIMIT=512m\nGATEWAY_CPU_LIMIT=1.0\nKROKI_PIDS_LIMIT=256\nKROKI_MEMORY_LIMIT=1g\nKROKI_CPU_LIMIT=2.0\nMERMAID_PIDS_LIMIT=256\nMERMAID_MEMORY_LIMIT=1g\nMERMAID_CPU_LIMIT=1.0\n\nGATEWAY_IMAGE=${images.gateway.reference}\nKROKI_IMAGE=${images.kroki.reference}\nMERMAID_IMAGE=${images.mermaid.reference}\n`;
 await writeFile(path.join(releaseDirectory, "diagram-as-code.env.example"), environmentExample, "utf8");

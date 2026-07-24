@@ -37,7 +37,7 @@ npm run test:container-policy
 
 Extension Host E2E được chạy bằng `npm --workspace=diagram-as-code-vscode run test:e2e`; đặt `VSCODE_TEST_VERSION=1.100.0` để kiểm tra version tối thiểu.
 
-Các quy trình TLS, key rotation, update và rollback nằm trong [Infrastructure and Operations](docs/infrastructure-operations.md). Quy trình đóng gói, phát hành và rollback version nằm trong [Release Guide](docs/release-guide.md); quyết định phát hành dùng [MVP Go/No-Go Checklist](docs/go-no-go-checklist.md).
+Các quy trình TLS, key rotation, update và rollback nằm trong [Infrastructure and Operations](docs/infrastructure-operations.md). Người dùng Windows có thể dùng ZIP installer versioned để cài Gateway loopback qua Docker Desktop; xem [Windows Server Installer](windows-installer/README.md). Quy trình đóng gói, phát hành, Marketplace và rollback version nằm trong [Release Guide](docs/release-guide.md) và [Marketplace Publishing](docs/marketplace-publishing.md); quyết định phát hành dùng [MVP Go/No-Go Checklist](docs/go-no-go-checklist.md).
 
 ## Phạm vi MVP
 

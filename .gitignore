@@ -25,6 +25,7 @@ coverage/
 test-results/
 playwright-report/
 blob-report/
+testResults.xml
 
 # Java and Vert.x build output
 target/

@@ -8,11 +8,13 @@ import { parseDiagramConfig } from "@diagram-as-code/diagram-config";
 
 import {
   buildVerificationPlan,
+  buildDiagramReviewRows,
   assertUniqueOutputPaths,
   deterministicRequest,
   findOrphanedOutputs,
   parseActionInputs,
   parseNameStatus,
+  pullRequestContextFromEvent,
   resolveWithinRoot,
   type FileChange,
 } from "../src/core.ts";
@@ -108,6 +110,50 @@ test("parses rename and deletion records from git name-status", () => {
     { status: "R", oldPath: "old/a.mmd", path: "new/a.mmd" },
     { status: "D", path: "old/b.puml" },
   ]);
+});
+
+test("builds visual review links for a changed diagram", () => {
+  const context = pullRequestContextFromEvent({
+    pull_request: { number: 18, base: { sha: "base123" }, head: { sha: "head456" } },
+  }, "owner/repo", "https://github.example.com");
+  assert.deepEqual(context, {
+    repository: "owner/repo",
+    serverUrl: "https://github.example.com",
+    number: 18,
+    baseSha: "base123",
+    headSha: "head456",
+  });
+  assert.ok(context);
+  const rows = buildDiagramReviewRows([{
+    sourcePath: "docs/diagrams/new name.mmd",
+    outputPath: "docs/generated/new name.svg",
+    status: "stale",
+  }], [{ status: "M", path: "docs/diagrams/new name.mmd" }], context);
+  assert.equal(rows.length, 1);
+  assert.match(rows[0]?.source ?? "", /new%20name\.mmd/);
+  assert.match(rows[0]?.generatedOutput ?? "", /new%20name\.svg/);
+  assert.match(rows[0]?.before ?? "", /base123/);
+  assert.match(rows[0]?.after ?? "", /head456/);
+  assert.match(rows[0]?.visualDiff ?? "", /pull\/18\/files#diff-[a-f0-9]{64}/);
+});
+
+test("keeps renamed output links on the correct base and head sides", () => {
+  const context = {
+    repository: "owner/repo",
+    serverUrl: "https://github.example.com",
+    number: 18,
+    baseSha: "base123",
+    headSha: "head456",
+  };
+  const rows = buildDiagramReviewRows([
+    { sourcePath: "docs/diagrams/old.mmd", outputPath: "docs/generated/old.svg", status: "orphaned" },
+    { sourcePath: "docs/diagrams/new.mmd", outputPath: "docs/generated/new.svg", status: "current" },
+  ], [{ status: "R", oldPath: "docs/diagrams/old.mmd", path: "docs/diagrams/new.mmd" }], context);
+  assert.equal(rows.length, 2);
+  assert.match(rows[0]?.before ?? "", /base123/);
+  assert.equal(rows[0]?.after, "");
+  assert.equal(rows[1]?.before, "");
+  assert.match(rows[1]?.after ?? "", /head456/);
 });
 
 test("finds orphaned SVG and PNG files during a full scan", () => {

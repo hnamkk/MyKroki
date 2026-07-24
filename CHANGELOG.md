@@ -13,6 +13,9 @@ versioned entry and uses it as the GitHub release notes.
 
 ### Added
 
+- Add per-diagram pull request review links in the GitHub Action summary, pointing to source, base/head output, and the GitHub file diff without exposing source or credentials.
+- Add a versioned Windows server installer ZIP with loopback-only Compose override, verifier-record API keys, managed operations, and rollback on failed update readiness.
+- Add Marketplace-ready VSIX metadata, icon packaging checks, release contract tests, and an optional protected Marketplace publish step.
 - Integrate the Diagram as Code product workspace with its Fastify Gateway, shared contracts, VS Code extension, GitHub Action, deployment files, and product CI/release workflows.
 - Standardize `.diagram.yml` with a shared JSON Schema and output planner, align Gateway and clients to the OpenAPI v1 routes, and add per-principal rate limiting.
 - Harden the Gateway production boundary with hashed API-key records and scopes, partitioned weighted TTL cache with failure degradation, bounded render concurrency, response-size limits, SVG sanitization, PNG/content-type validation, structured redacted events, and aggregate Prometheus metrics.

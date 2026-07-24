@@ -103,6 +103,7 @@ jobs:
         run: >-
           gh release create "${GITHUB_REF_NAME}"
           product/release/${GITHUB_REF_NAME}/diagram-as-code-vscode-*.vsix
+          product/release/${GITHUB_REF_NAME}/diagram-as-code-server-*.zip
           product/release/${GITHUB_REF_NAME}/diagram-as-code-action-*.cjs
           product/release/${GITHUB_REF_NAME}/docker-compose.yml
           product/release/${GITHUB_REF_NAME}/diagram-as-code.env.example
@@ -113,3 +114,11 @@ jobs:
           product/release/${GITHUB_REF_NAME}/SHA256SUMS
           --notes-file product/release/${GITHUB_REF_NAME}/RELEASE_NOTES.md
           --title "${GITHUB_REF_NAME}"
+      - name: Publish VS Code extension to Marketplace
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}
+        if: ${{ env.VSCE_PAT != '' }}
+        working-directory: product
+        run: |
+          version="${GITHUB_REF_NAME#product-v}"
+          npx --no-install vsce publish --packagePath "release/${GITHUB_REF_NAME}/diagram-as-code-vscode-${version}.vsix" --pat "$VSCE_PAT"
