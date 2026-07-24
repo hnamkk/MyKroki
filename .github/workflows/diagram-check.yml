@@ -8,9 +8,17 @@ on:
   push:
     branches:
       - main
+    paths:
+      - ".diagram-pilot.yml"
+      - "product/examples/pilot-repository/**"
+      - ".github/workflows/diagram-check.yml"
   pull_request:
     branches:
       - main
+    paths:
+      - ".diagram-pilot.yml"
+      - "product/examples/pilot-repository/**"
+      - ".github/workflows/diagram-check.yml"
   workflow_dispatch:
 
 permissions:

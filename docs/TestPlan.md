@@ -74,7 +74,7 @@
 | Supply chain | Product CI `npm sbom`, Anchore SBOM và Trivy | SBOM cho npm/Gateway/Kroki/Mermaid; image build từ commit hiện tại không có High/Critical, không bỏ qua advisory chưa có bản vá. |
 | GitHub Action unit/integration | `npm test --workspace=diagram-as-code-action --prefix product` | Input/path guard, planner rename/delete/full scan, output collision, API key, HTTP taxonomy, annotation, check read-only, generate rollback, artifact manifest và committed CommonJS bundle khởi động trên Node.js 24. |
 | GitHub Action runner E2E | Job Compose trong `.github/workflows/product-ci.yml` | Bundle thật gọi Gateway thật; current/stale/syntax/auth, artifact upload, PR generate guard và trusted generate. |
-| GitHub Action personal workflow | `.github/workflows/diagram-check.yml` trên self-hosted Windows | API key + Gateway local; PR trusted chạy changed-only, push `main`/manual full scan; condition loại fork và repository policy yêu cầu approval/tắt fork workflow. |
+| GitHub Action personal workflow | `.github/workflows/diagram-check.yml` trên self-hosted Windows | Chỉ trigger khi `.diagram-pilot.yml` hoặc fixture pilot thay đổi; API key + Gateway local; PR trusted chạy changed-only, push `main`/manual full scan; condition loại fork và repository policy yêu cầu approval/tắt fork workflow. |
 | Pilot generation | `npm run pilot:generate --prefix product` | Shared config/planner gọi Gateway thật và tạo đúng bốn SVG Mermaid/C4/Graphviz/D2. |
 | Release bundle | `npm run release:prepare --prefix product` và `npm run release:verify --prefix product` | Đồng bộ version, VSIX/Action/Compose/config lock, SPDX SBOM, manifest và SHA-256; VSIX được package hai lần để so hash; tagged workflow bổ sung digest/SBOM ba image. |
 

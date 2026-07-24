@@ -1106,7 +1106,7 @@ Kế hoạch kiểm thử chi tiết, môi trường tham chiếu và danh sách
 | Supply chain | SBOM cho npm và ba image runtime; Trivy chặn mọi High/Critical trên image build từ commit; runtime image loại compiler/header packages sau assembly; GitHub Actions bên thứ ba pin commit SHA. |
 | Release/pilot | Pilot fixture bốn engine, manifest/checksum verification, tagged image consistency, setup dưới 30 phút và upgrade/rollback rehearsal. |
 
-CI dùng hai mức chi phí. Pull request chạy quick gates: Product quality/contract, Java fork regression, VS Code Extension Host và Diagram check; Upstream Kroki PR chỉ build/test Java. Product Compose acceptance và Upstream container build/smoke bị skip trên event PR, nhưng chạy đầy đủ sau push `main`, manual dispatch trên candidate branch hoặc nightly reusable workflow. Release evidence chỉ chấp nhận full run, không dùng kết quả quick PR thay thế.
+CI dùng hai mức chi phí. Pull request chạy quick gates: Product quality/contract, Java fork regression và VS Code Extension Host; Diagram check chỉ chạy khi `.diagram-pilot.yml`, fixture diagram hoặc output fixture thay đổi. Upstream Kroki PR chỉ build/test Java. Product Compose acceptance và Upstream container build/smoke bị skip trên event PR, nhưng chạy đầy đủ sau push `main`, manual dispatch trên candidate branch hoặc nightly reusable workflow. Release evidence chỉ chấp nhận full run, không dùng kết quả quick PR thay thế.
 
 ## 10. Điểm cần xác nhận trước implementation
 
