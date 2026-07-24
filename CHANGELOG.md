@@ -43,6 +43,7 @@ versioned entry and uses it as the GitHub release notes.
 
 ### Fixed
 
+- Build the shared contracts and diagram-config workspaces before pilot generation so the full Compose gate works from a clean `npm ci` checkout.
 - Make the bundled GitHub Action start correctly on the Node.js 24 runner by preserving `import.meta.url` semantics in its CommonJS bundle.
 - Keep VS Code preview refreshes from superseding render-on-save writes, and make the Windows Extension Host E2E assertions independent of LF/CRLF line endings.
 - Make dependency recovery wait for a successful Mermaid render after backend restart instead of failing on a transient 503.
