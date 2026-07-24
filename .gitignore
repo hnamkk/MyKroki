@@ -53,3 +53,6 @@ node_modules/
 
 # Local workflow state and the imported reference repository
 /.specify/feature.json
+
+# Local reference implementation used for comparison only.
+/upgrade-diagram-as-code/
