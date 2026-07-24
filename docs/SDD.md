@@ -6,7 +6,7 @@
 |---|---|
 | Tài liệu | Software Design Document (SDD) |
 | Phiên bản | 1.0 |
-| Trạng thái | Bản nháp thiết kế từ SRS 1.0 |
+| Trạng thái | Đã phê duyệt - Baseline thiết kế 1.0 |
 | SRS nguồn | [`docs/SRS.md`](./SRS.md) |
 | Phạm vi | MVP và các điểm mở rộng `Should` đã được định hướng |
 | Ngày | 2026-07-22 |
@@ -1106,15 +1106,15 @@ Kế hoạch kiểm thử chi tiết, môi trường tham chiếu và danh sách
 | Supply chain | SBOM cho npm và ba image runtime; Trivy chặn mọi High/Critical trên image build từ commit; runtime image loại compiler/header packages sau assembly; GitHub Actions bên thứ ba pin commit SHA. |
 | Release/pilot | Pilot fixture bốn engine, manifest/checksum verification, tagged image consistency, setup dưới 30 phút và upgrade/rollback rehearsal. |
 
-CI dùng hai mức chi phí. Pull request chạy quick gates: Product quality/contract, Java fork regression và VS Code Extension Host; Diagram check chỉ chạy khi `.diagram-pilot.yml`, fixture diagram hoặc output fixture thay đổi, và repository đã opt in bằng Variable `DIAGRAM_CHECK_ENABLED=true` cùng runner tương ứng. Upstream Kroki PR chỉ build/test Java. Product Compose acceptance và Upstream container build/smoke bị skip trên event PR, nhưng chạy đầy đủ sau push `main`, manual dispatch trên candidate branch hoặc nightly reusable workflow. Release evidence chỉ chấp nhận full run, không dùng kết quả quick PR thay thế.
+CI dùng hai mức chi phí. Pull request chạy quick gates: Product quality/contract, Java fork regression và VS Code Extension Host; Diagram check chỉ chạy khi `.diagram-pilot.yml`, fixture diagram hoặc output fixture thay đổi, và repository đã opt in bằng Variable `DIAGRAM_CHECK_ENABLED=true` cùng runner tương ứng. Upstream Kroki PR chỉ build/test Java. Product Compose acceptance và Upstream container build/smoke bị skip trên event PR, nhưng chạy đầy đủ sau push `main`, manual dispatch trên candidate branch hoặc nightly reusable workflow. Release evidence chỉ chấp nhận full run, không dùng kết quả quick PR thay thế. Cổng pilot retry có giới hạn với `429`, `503`, `504`, sau đó so byte và SHA-256 của bốn SVG với bản commit; báo cáo `pilot-reproducibility.json` được lưu cùng reliability artifacts để lỗi drift không bị rút gọn thành một exit code.
 
-## 10. Điểm cần xác nhận trước implementation
+## 10. Các quyết định đã chốt
 
-| ID | Nội dung cần xác nhận | Đề xuất hiện tại |
+| ID | Nội dung đã chốt | Quyết định |
 |---|---|---|
-| OPEN-01 | Runtime của Gateway và Kroki | Đã chốt bởi ADR-011: Node.js 24 cho Gateway, Java 25 cho Kroki |
-| OPEN-02 | API key store MVP | Mounted secret/config + admin CLI, không thêm database |
-| OPEN-03 | OIDC có vào MVP hay bản kế tiếp | Đã triển khai trong Phase 5 theo mức `Should` của SRS |
-| OPEN-04 | Redis có cần trong demo | Không; in-memory LRU đủ cho single-instance MVP |
-| OPEN-05 | Có bắt buộc PDF trong MVP | Không; SVG/PNG trước |
-| OPEN-06 | Generated manifest có commit hay không | `Should`; MVP có thể render và so hash trực tiếp |
+| DEC-01 | Runtime của Gateway và Kroki | ADR-011: Node.js 24 cho Gateway, Java 25 cho Kroki |
+| DEC-02 | API key store MVP | Mounted secret/config + admin CLI, không thêm database |
+| DEC-03 | OIDC trong MVP | Đã triển khai trong Phase 5 theo mức `Should` của SRS |
+| DEC-04 | Redis trong demo | Không; in-memory LRU đủ cho single-instance MVP |
+| DEC-05 | PDF trong MVP | Không; SVG/PNG trước |
+| DEC-06 | Generated manifest | `Should`; MVP render và so byte/hash trực tiếp |
