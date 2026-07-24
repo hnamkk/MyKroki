@@ -383,7 +383,7 @@ Chứng minh hệ thống ổn định trong điều kiện tải, lỗi depende
 
 ### Trạng thái
 
-Đã hoàn tất phần triển khai trong repository: version/schema/image lock, pilot fixture bốn engine, release bundle có SBOM/manifest/checksum, tagged workflow publish ba image cùng version/digest, operations/release runbook, E2E setup guide và go/no-go checklist. Phase chỉ được đánh dấu `Done` sau khi có ba full Product CI xanh liên tiếp, pilot PR thật, rehearsal upgrade/rollback bằng hai version và mentor acceptance sign-off.
+Đã hoàn tất phần triển khai trong repository: version/schema/image lock, pilot fixture bốn engine, release bundle có SBOM/manifest/checksum, tagged workflow publish ba image cùng version/digest, operations/release runbook, E2E setup guide và go/no-go checklist. Repository pilot thật đã chạy các PR stale/syntax; bằng chứng visual review cuối vẫn cần ghi vào biên bản. Phase chỉ được đánh dấu `Done` sau khi có ba full Product CI xanh liên tiếp, pilot evidence đầy đủ, rehearsal upgrade/rollback bằng hai version và mentor acceptance sign-off.
 
 ### Work packages
 
@@ -404,7 +404,7 @@ Chứng minh hệ thống ổn định trong điều kiện tải, lỗi depende
 | P7-01 | `.diagram-renderer.lock` khóa Gateway, config schema, Kroki/Mermaid; release manifest khóa ba image cùng tag và digest khi publish. |
 | P7-02 | `docs/E2E_SETUP_GUIDE.md` bao phủ Compose, API key/OIDC, VSIX, Action và `.diagram.yml`. |
 | P7-03 | `product/docs/infrastructure-operations.md` bao phủ health, logs, metrics, key rotation, backup, upgrade và rollback. |
-| P7-04 | `product/examples/pilot-repository` có Mermaid, C4-PlantUML, Graphviz và D2 cùng generated SVG/workflow pin version. |
+| P7-04 | Fixture `product/examples/pilot-repository` có Mermaid, C4-PlantUML, Graphviz và D2. Pilot thật tại [hnamkk/mykroki-action-pilot](https://github.com/hnamkk/mykroki-action-pilot) đã có [PR stale](https://github.com/hnamkk/mykroki-action-pilot/pull/1) và [PR syntax](https://github.com/hnamkk/mykroki-action-pilot/pull/2); cần ghi thêm kết quả visual review cuối vào biên bản acceptance. |
 | P7-05 | Acceptance matrix và biên bản mẫu nằm trong E2E guide/go-no-go checklist; buổi sign-off thực tế còn cần mentor. |
 | P7-06 | `release:prepare` tạo VSIX, Action bundle, Windows installer ZIP, Compose/env/config lock, npm SBOM, manifest/checksum; tagged workflow publish và thêm SBOM ba image. |
 | P7-07 | `product/docs/go-no-go-checklist.md` công bố external gates, known limitations, owner và No-Go conditions. |

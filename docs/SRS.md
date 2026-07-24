@@ -7,7 +7,7 @@
 | Tài liệu | Software Requirements Specification (SRS) |
 | Sản phẩm | Diagram as Code - Rendering Service and Toolchain |
 | Phiên bản tài liệu | 1.0 |
-| Trạng thái | Bản nháp chờ phê duyệt |
+| Trạng thái | Đã phê duyệt - Baseline 1.0 |
 | Chuẩn tham chiếu | IEEE 830-1998 |
 | Phạm vi phiên bản | MVP và các yêu cầu mở rộng đã được ưu tiên |
 

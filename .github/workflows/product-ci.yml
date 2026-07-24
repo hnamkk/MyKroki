@@ -320,7 +320,7 @@ jobs:
           DIAGRAM_API_KEY: ci-secret
         run: |
           timeout --signal=TERM --kill-after=1m 5m npm run pilot:generate
-          git diff --exit-code -- examples/pilot-repository/generated
+          npm run pilot:verify
         working-directory: product
       - name: Prepare GitHub Action E2E fixture
         env:

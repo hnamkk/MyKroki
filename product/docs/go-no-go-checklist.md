@@ -21,7 +21,7 @@ Implementation Phase 1-7 đã có thể chạy và kiểm thử local. Release t
 | Fork image publication | Ready in workflow | Tagged workflow publish Gateway/Kroki/Mermaid cùng product tag/digest |
 | Known limitations | Ready | Release notes và E2E guide |
 | Ba full Product CI xanh liên tiếp | Pending external evidence | Gắn ba run URL liên tiếp |
-| Pilot repository PR | Pending external evidence | Gắn repository/PR URL, gồm stale và syntax case |
+| Pilot repository PR | Partial external evidence | [Repository pilot](https://github.com/hnamkk/mykroki-action-pilot), [PR stale #1](https://github.com/hnamkk/mykroki-action-pilot/pull/1), [PR syntax #2](https://github.com/hnamkk/mykroki-action-pilot/pull/2); còn ghi nhận visual review/final baseline vào biên bản |
 | Upgrade/rollback rehearsal bằng hai version thật | Pending external evidence | Gắn biên bản, người thực hiện và thời gian |
 | Mentor acceptance session | Pending external evidence | Gắn issue/biên bản và quyết định scope |
 
@@ -52,7 +52,7 @@ Implementation Phase 1-7 đã có thể chạy và kiểm thử local. Release t
 |---|---|
 | Ngày/giờ | |
 | Commit/tag ứng viên | |
-| Pilot repository/PR | |
+| Pilot repository/PR | [hnamkk/mykroki-action-pilot](https://github.com/hnamkk/mykroki-action-pilot), [PR #1](https://github.com/hnamkk/mykroki-action-pilot/pull/1), [PR #2](https://github.com/hnamkk/mykroki-action-pilot/pull/2) |
 | Product CI run 1 | |
 | Product CI run 2 | |
 | Product CI run 3 | |

@@ -9,6 +9,7 @@ import {
   parseDiagramConfig,
 } from "@diagram-as-code/diagram-config";
 
+import { renderPilotRequest } from "./pilot-render.mjs";
 import { waitForReadiness } from "./quality-utils.mjs";
 
 const productRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
@@ -38,14 +39,13 @@ for (const absoluteSourcePath of sourceFiles) {
 
   const source = await readFile(absoluteSourcePath, "utf8");
   const request = deterministicRenderRequest(sourcePath, source, config);
-  const response = await fetch(`${gatewayUrl}/api/v1/render`, {
+  const response = await renderPilotRequest(`${gatewayUrl}/api/v1/render`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
     },
     body: JSON.stringify(request),
-    signal: AbortSignal.timeout(30_000),
   });
   if (!response.ok) {
     const problem = await response.text();

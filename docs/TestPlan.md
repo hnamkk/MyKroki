@@ -75,7 +75,7 @@
 | GitHub Action unit/integration | `npm test --workspace=diagram-as-code-action --prefix product` | Input/path guard, planner rename/delete/full scan, output collision, API key, HTTP taxonomy, annotation, check read-only, generate rollback, artifact manifest và committed CommonJS bundle khởi động trên Node.js 24. |
 | GitHub Action runner E2E | Job Compose trong `.github/workflows/product-ci.yml` | Bundle thật gọi Gateway thật; current/stale/syntax/auth, artifact upload, PR generate guard và trusted generate. |
 | GitHub Action personal workflow | `.github/workflows/diagram-check.yml` trên self-hosted Windows | Chỉ trigger khi `.diagram-pilot.yml` hoặc fixture pilot thay đổi và Variable `DIAGRAM_CHECK_ENABLED=true`; API key + Gateway local; PR trusted chạy changed-only, push `main`/manual full scan; condition loại fork và repository policy yêu cầu approval/tắt fork workflow. |
-| Pilot generation | `npm run pilot:generate --prefix product` | Shared config/planner gọi Gateway thật và tạo đúng bốn SVG Mermaid/C4/Graphviz/D2. |
+| Pilot generation/reproducibility | `npm run pilot:generate --prefix product` rồi `npm run pilot:verify --prefix product` | Shared config/planner gọi Gateway thật, retry có giới hạn với `429/503/504`, tạo đúng bốn SVG Mermaid/C4/Graphviz/D2 và so byte/SHA-256 với baseline commit; lưu `pilot-reproducibility.json`. |
 | Release bundle | `npm run release:prepare --prefix product` và `npm run release:verify --prefix product` | Đồng bộ version, VSIX/Action/Compose/config lock, SPDX SBOM, manifest và SHA-256; VSIX được package hai lần để so hash; tagged workflow bổ sung digest/SBOM ba image. |
 
 Các cổng full trên chạy trong job Compose của Product CI trên image Kroki/Mermaid được build từ cùng checkout. Compose bị skip trên `pull_request` để PR nhận feedback nhanh; nó chạy trên push `main` và `workflow_dispatch` của branch candidate. Job và từng lệnh có deadline; HTTP E2E có request timeout riêng và runner tôn trọng `Retry-After` khi acceptance vượt burst rate limit.
@@ -267,7 +267,7 @@ Rate-limit integration test được phép dùng profile nhỏ hơn, ví dụ 6/
 |---|---|---|---|---|---|
 | TC-REL-001 | Version lock | Package/config/renderer lock tồn tại | Chạy `release:prepare` rồi đọc manifest. | Gateway/schema/Kroki/Mermaid đồng bộ; ba image cùng product tag, digest hợp lệ khi CI cung cấp. | P0 |
 | TC-REL-002 | Artifact integrity | Release bundle đã tạo | Chạy `release:verify` và `sha256sum --check`. | Mọi artifact khớp manifest và `SHA256SUMS`; sửa một byte phải fail. | P0 |
-| TC-REL-003 | Pilot | Reference Compose ready | Chạy `pilot:generate`, VS Code preview/export và Action check trên fixture. | Bốn engine có SVG; client dùng cùng output path; check không sửa repository. | P0 |
+| TC-REL-003 | Pilot | Reference Compose ready | Chạy `pilot:generate`, `pilot:verify`, VS Code preview/export và Action check trên fixture. | Bốn engine có SVG; client dùng cùng output path; check không sửa repository; JSON report xác nhận byte/hash tái lập và chỉ retry lỗi `429/503/504`. | P0 |
 | TC-REL-004 | Upgrade/Rollback | Có hai release env versioned | Deploy version mới, smoke; khôi phục env cũ và smoke lại. | Readiness/render trở lại bình thường; không cần data migration; owner/evidence được ghi. | P0 |
 | TC-REL-005 | New-user setup | Máy sạch có prerequisites | Làm theo `docs/E2E_SETUP_GUIDE.md`. | Local stack và pilot bốn engine hoạt động trong tối đa 30 phút mà không đọc source. | P0 |
 
