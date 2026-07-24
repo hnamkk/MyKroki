@@ -49,10 +49,12 @@ node_modules/
 
 # GitHub Actions execute the committed bundle directly.
 !/product/github-action/dist/
+/product/github-action/dist/*
 !/product/github-action/dist/index.cjs
 
 # Local workflow state and the imported reference repository
 /.specify/feature.json
 
-# Local reference implementation used for comparison only.
+# Standalone local pilot repository (has its own .git directory).
+/mykroki-action-pilot/
 /upgrade-diagram-as-code/
